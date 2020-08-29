@@ -1,0 +1,37 @@
+{
+	"NAME": "Intellivoid Accounts API",
+	"DOCUMENTATION_URL": "https://gist.github.com/Netkas/e8977b26f482ca40911a949df7dd286f",
+	"BASE_PATH": "/intellivoid",
+	"AVAILABLE": true,
+	"UNAVAILABLE_MESSAGE": "This API service is not available right now",
+	"DEBUG_EXCEPTIONS": false,
+	"VERSION_CONFIGURATIONS": [
+		{
+			"VERSION": "v1",
+			"AVAILABLE": true,
+			"UNAVAILABLE_MESSAGE": "This version is not available at the moment, please check back later",
+			"LIBRARIES": {},
+			"PPM": [
+				{"package": "net.intellivoid.api", "version": "latest", "import_dependencies": true, "throw_error": true},
+				{"package": "net.intellivoid.accounts", "version": "latest", "import_dependencies": true, "throw_error": true}
+			],
+			"MODULES": [
+				{
+					"script": "get_application", "path": "application",
+					"available": true, "authentication_required": false,
+					"unavailable_message": "This module is not available at the moment"
+				},
+				{
+					"script": "coa_request_authentication", "path": "auth/coa/request_authentication",
+					"available": true, "authentication_required": false,
+					"unavailable_message": "This module is not available at the moment"
+				},
+				{
+					"script": "coa_get_access_token", "path": "auth/coa/get_access_token",
+					"available": true, "authentication_required": false,
+					"unavailable_message": "This module is not available at the moment"
+				}
+			]
+		}
+	]
+}
