@@ -1,14 +1,18 @@
 <?php
 
-    /** @noinspection PhpUnused */
-    /** @noinspection PhpIllegalPsrClassPathInspection */
+    /**
+     * @noinspection PhpMissingFieldTypeInspection
+     * @noinspection DuplicatedCode
+     * @noinspection PhpUnused
+     * @noinspection PhpIllegalPsrClassPathInspection
+     */
 
     namespace modules\v1;
 
     use Exception;
     use Handler\Abstracts\Module;
-    use Handler\Handler;
     use Handler\Interfaces\Response;
+    use HttpAuthenticationFailure;
     use IntellivoidAccounts\Abstracts\ApplicationStatus;
     use IntellivoidAccounts\Abstracts\AuthenticationMode;
     use IntellivoidAccounts\Abstracts\SearchMethods\ApplicationSearchMethod;
@@ -17,32 +21,34 @@
     use IntellivoidAPI\Objects\AccessRecord;
 
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "resolve_coa_error.php");
+    require_once(__DIR__ . DIRECTORY_SEPARATOR . "client.php");
+    require_once(__DIR__ . DIRECTORY_SEPARATOR . "authentication.php");
 
     /**
-     * Class get_application
+     * Class coa_get_application
      */
-    class get_application extends Module implements  Response
+    class coa_get_application extends Module implements  Response
     {
         /**
          * The name of the module
          *
          * @var string
          */
-        public $name = 'create_authentication_request';
+        public $name = "coa_get_application";
 
         /**
          * The version of this module
          *
          * @var string
          */
-        public $version = '1.0.0.0';
+        public $version = "1.0.0.0";
 
         /**
          * The description of this module
          *
          * @var string
          */
-        public $description = "Returns information about the user that's available in the Spam Protection Database";
+        public $description = "Returns information about the Application's Public Information";
 
         /**
          * Optional access record for this module
@@ -70,7 +76,7 @@
          */
         public function getContentType(): string
         {
-            return 'application/json';
+            return "application/json";
         }
 
         /**
@@ -118,44 +124,24 @@
          */
         public function processRequest()
         {
-            $Parameters = Handler::getParameters(true, true);
-
-            if(isset($Parameters["application_id"]) == false)
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 400,
-                    "error" => array(
-                        "error_code" => 0,
-                        "type" => "CLIENT",
-                        "message" => "Missing parameter 'application_id'"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload['response_code'];
-                return null;
-            }
-
-            $IntellivoidAccounts = new IntellivoidAccounts();
-
             try
             {
-                $Application = $IntellivoidAccounts->getApplicationManager()->getApplication(
-                    ApplicationSearchMethod::byApplicationId, $Parameters["application_id"]
-                );
+                // Process the authentication requirements
+                $Authentication = fetchApplicationAuthentication(false);
             }
-            catch (ApplicationNotFoundException $e)
+            catch (HttpAuthenticationFailure $e)
             {
                 $ResponsePayload = array(
                     "success" => false,
-                    "response_code" => 404,
+                    "response_code" => $e->getStatusCode(),
                     "error" => array(
-                        "error_code" => 2,
-                        "message" => resolve_error_code(2)
+                        "error_code" => $e->getCode(),
+                        "message" => $e->getMessage(),
+                        "type" => "COA"
                     )
                 );
                 $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload['response_code'];
+                $this->response_code = $e->getStatusCode();
                 return null;
             }
             catch(Exception $e)
@@ -165,11 +151,51 @@
                     "response_code" => 500,
                     "error" => array(
                         "error_code" => -1,
-                        "message" => resolve_error_code(-1)
+                        "message" => "An unexpected internal server occurred while trying to process the client's authentication",
+                        "type" => "SERVER"
                     )
                 );
                 $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload['response_code'];
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+
+            $IntellivoidAccounts = new IntellivoidAccounts();
+
+            try
+            {
+                $Application = $IntellivoidAccounts->getApplicationManager()->getApplication(
+                    ApplicationSearchMethod::byApplicationId, $Authentication["application_id"]
+                );
+            }
+            catch (ApplicationNotFoundException $e)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 404,
+                    "error" => array(
+                        "error_code" => 2,
+                        "message" => resolve_error_code(2),
+                        "type" => "COA"
+                    )
+                );
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+            catch(Exception $e)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 500,
+                    "error" => array(
+                        "error_code" => -1,
+                        "message" => resolve_error_code(-1),
+                        "type" => "COA"
+                    )
+                );
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
                 return null;
             }
 
@@ -224,7 +250,7 @@
             }
 
             $this->response_content = json_encode($ResponsePayload);
-            $this->response_code = (int)$ResponsePayload['response_code'];
+            $this->response_code = (int)$ResponsePayload["response_code"];
             return null;
 
         }

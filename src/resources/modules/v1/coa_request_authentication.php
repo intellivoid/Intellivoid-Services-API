@@ -1,7 +1,11 @@
 <?php
 
-    /** @noinspection PhpUnused */
-    /** @noinspection PhpIllegalPsrClassPathInspection */
+    /**
+     * @noinspection PhpMissingFieldTypeInspection
+     * @noinspection DuplicatedCode
+     * @noinspection PhpUnused
+     * @noinspection PhpIllegalPsrClassPathInspection
+     */
 
     namespace modules\v1;
 
@@ -10,6 +14,7 @@
     use Handler\Abstracts\Module;
     use Handler\Handler;
     use Handler\Interfaces\Response;
+    use HttpAuthenticationFailure;
     use IntellivoidAccounts\Abstracts\ApplicationStatus;
     use IntellivoidAccounts\Abstracts\AuthenticationMode;
     use IntellivoidAccounts\Abstracts\AuthenticationRequestStatus;
@@ -20,9 +25,10 @@
 
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "resolve_coa_error.php");
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "client.php");
+    require_once(__DIR__ . DIRECTORY_SEPARATOR . "authentication.php");
 
     /**
-     * Class get_application
+     * Class coa_request_authentication
      */
     class coa_request_authentication extends Module implements  Response
     {
@@ -31,14 +37,14 @@
          *
          * @var string
          */
-        public $name = 'coa_request_authentication';
+        public $name = "coa_request_authentication";
 
         /**
          * The version of this module
          *
          * @var string
          */
-        public $version = '1.0.0.0';
+        public $version = "1.0.0.0";
 
         /**
          * The description of this module
@@ -73,7 +79,7 @@
          */
         public function getContentType(): string
         {
-            return 'application/json';
+            return "application/json";
         }
 
         /**
@@ -124,19 +130,39 @@
         {
             $Parameters = Handler::getParameters(true, true);
 
-            // Check the main parameters
-            if(isset($Parameters["application_id"]) == false)
+            try
+            {
+                // Process the authentication requirements
+                $Authentication = fetchApplicationAuthentication(false);
+            }
+            catch (HttpAuthenticationFailure $e)
             {
                 $ResponsePayload = array(
                     "success" => false,
-                    "response_code" => 400,
+                    "response_code" => $e->getStatusCode(),
                     "error" => array(
-                        "error_code" => 0,
-                        "message" => "Missing parameter 'application_id'"
+                        "error_code" => $e->getCode(),
+                        "message" => $e->getMessage(),
+                        "type" => "COA"
                     )
                 );
                 $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload['response_code'];
+                $this->response_code = $e->getStatusCode();
+                return null;
+            }
+            catch(Exception $e)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 500,
+                    "error" => array(
+                        "error_code" => -1,
+                        "message" => "An unexpected internal server occurred while trying to process the client's authentication",
+                        "type" => "SERVER"
+                    )
+                );
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
                 return null;
             }
 
@@ -147,7 +173,7 @@
             try
             {
                 $Application = $IntellivoidAccounts->getApplicationManager()->getApplication(
-                    ApplicationSearchMethod::byApplicationId, $Parameters["application_id"]
+                    ApplicationSearchMethod::byApplicationId, $Authentication["application_id"]
                 );
             }
             catch (ApplicationNotFoundException $e)
@@ -157,11 +183,12 @@
                     "response_code" => 404,
                     "error" => array(
                         "error_code" => 2,
-                        "message" => resolve_error_code(2)
+                        "message" => resolve_error_code(2),
+                        "type" => "COA"
                     )
                 );
                 $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload['response_code'];
+                $this->response_code = (int)$ResponsePayload["response_code"];
                 return null;
             }
             catch(Exception $e)
@@ -171,11 +198,12 @@
                     "response_code" => 500,
                     "error" => array(
                         "error_code" => -1,
-                        "message" => resolve_error_code(-1)
+                        "message" => resolve_error_code(-1),
+                        "type" => "COA"
                     )
                 );
                 $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload['response_code'];
+                $this->response_code = (int)$ResponsePayload["response_code"];
                 return null;
             }
 
@@ -187,11 +215,12 @@
                     "response_code" => 403,
                     "error" => array(
                         "error_code" => 3,
-                        "message" => resolve_error_code(3)
+                        "message" => resolve_error_code(3),
+                        "type" => "COA"
                     )
                 );
                 $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload['response_code'];
+                $this->response_code = (int)$ResponsePayload["response_code"];
                 return null;
             }
 
@@ -203,11 +232,12 @@
                     "response_code" => 403,
                     "error" => array(
                         "error_code" => 4,
-                        "message" => resolve_error_code(4)
+                        "message" => resolve_error_code(4),
+                        "type" => "COA"
                     )
                 );
                 $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload['response_code'];
+                $this->response_code = (int)$ResponsePayload["response_code"];
                 return null;
             }
 
@@ -221,11 +251,12 @@
                         "response_code" => 400,
                         "error" => array(
                             "error_code" => 6,
-                            "message" => resolve_error_code(6)
+                            "message" => resolve_error_code(6),
+                            "type" => "COA"
                         )
                     );
                     $this->response_content = json_encode($ResponsePayload);
-                    $this->response_code = (int)$ResponsePayload['response_code'];
+                    $this->response_code = (int)$ResponsePayload["response_code"];
                     return null;
                 }
             }
@@ -234,6 +265,7 @@
             try
             {
                 $ClientIP = Client::getClientIP();
+
                 if($ClientIP == "::1")
                 {
                     $ClientIP = "127.0.0.1";
@@ -248,11 +280,12 @@
                     "response_code" => 400,
                     "error" => array(
                         "error_code" => 5,
-                        "message" => resolve_error_code(5)
+                        "message" => resolve_error_code(5),
+                        "type" => "COA"
                     )
                 );
                 $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload['response_code'];
+                $this->response_code = (int)$ResponsePayload["response_code"];
                 return null;
             }
 
@@ -270,22 +303,23 @@
                     "response_code" => 500,
                     "error" => array(
                         "error_code" => -1,
-                        "message" => resolve_error_code(-1)
+                        "message" => resolve_error_code(-1),
+                        "type" => "COA"
                     )
                 );
                 $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload['response_code'];
+                $this->response_code = (int)$ResponsePayload["response_code"];
                 return null;
             }
 
             // Check the protocol
-            $protocol = 'https';
+            $protocol = "https";
 
             if(isset($Parameters["secured"]))
             {
                 if($Parameters["secured"] == "false" || $Parameters["secured"] == "0")
                 {
-                    $protocol = 'http';
+                    $protocol = "http";
                 }
             }
 
@@ -312,12 +346,30 @@
             // Return the results applicable to the Application's authentication mode
             if($Application->AuthenticationMode == AuthenticationMode::Redirect)
             {
-                $AuthenticationUrl = $protocol . "://accounts.intellivoid.net/auth/login?" . http_build_query(array(
-                        "auth" => "application",
-                        "redirect" => $Parameters["redirect"],
-                        "application_id" => $Application->PublicAppId,
-                        "request_token" => $AuthRequestToken->RequestToken
-                    ));
+                $AuthenticationParameters =  array(
+                    "auth" => "application",
+                    "redirect" => $Parameters["redirect"],
+                    "application_id" => $Application->PublicAppId,
+                    "request_token" => $AuthRequestToken->RequestToken
+                );
+
+                if(isset($Parameters["expand_ui"]))
+                {
+                    if($Parameters["expand_ui"] == "true" || $Parameters["expand_ui"] == "1")
+                    {
+                        $AuthenticationParameters["expanded"] = "1";
+                    }
+                }
+
+                if(isset($Parameters["require_close"]))
+                {
+                    if($Parameters["require_close"] == "true" || $Parameters["require_close"] == "1")
+                    {
+                        $AuthenticationParameters["require_close"] = "1";
+                    }
+                }
+
+                $AuthenticationUrl = $protocol . "://accounts.intellivoid.net/auth/login?" . http_build_query($AuthenticationParameters);
 
                 $ResponsePayload = array(
                     "success" => true,
@@ -331,16 +383,34 @@
                     )
                 );
                 $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload['response_code'];
+                $this->response_code = (int)$ResponsePayload["response_code"];
                 return null;
             }
             else
             {
-                $AuthenticationUrl = $protocol . "://accounts.intellivoid.net/auth/login?" . http_build_query(array(
-                        "auth" => "application",
-                        "application_id" => $Application->PublicAppId,
-                        "request_token" => $AuthRequestToken->RequestToken
-                    ));
+                $AuthenticationParameters =  array(
+                    "auth" => "application",
+                    "application_id" => $Application->PublicAppId,
+                    "request_token" => $AuthRequestToken->RequestToken
+                );
+
+                if(isset($Parameters["expand_ui"]))
+                {
+                    if($Parameters["expand_ui"] == "true" || $Parameters["expand_ui"] == "1")
+                    {
+                        $AuthenticationParameters["expanded"] = "1";
+                    }
+                }
+
+                if(isset($Parameters["require_close"]))
+                {
+                    if($Parameters["require_close"] == "true" || $Parameters["require_close"] == "1")
+                    {
+                        $AuthenticationParameters["require_close"] = "1";
+                    }
+                }
+
+                $AuthenticationUrl = $protocol . "://accounts.intellivoid.net/auth/login?" . http_build_query($AuthenticationParameters);
 
                 $ResponsePayload = array(
                     "success" => true,
@@ -354,7 +424,7 @@
                     )
                 );
                 $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload['response_code'];
+                $this->response_code = (int)$ResponsePayload["response_code"];
                 return null;
             }
         }

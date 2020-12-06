@@ -14,31 +14,33 @@
     use Handler\Handler;
     use Handler\Interfaces\Response;
     use HttpAuthenticationFailure;
-    use IntellivoidAccounts\Abstracts\ApplicationStatus;
-    use IntellivoidAccounts\Abstracts\SearchMethods\ApplicationSearchMethod;
-    use IntellivoidAccounts\Abstracts\SearchMethods\AuthenticationAccessSearchMethod;
-    use IntellivoidAccounts\Abstracts\SearchMethods\AuthenticationRequestSearchMethod;
-    use IntellivoidAccounts\Exceptions\ApplicationNotFoundException;
-    use IntellivoidAccounts\Exceptions\AuthenticationAccessNotFoundException;
-    use IntellivoidAccounts\Exceptions\AuthenticationRequestNotFoundException;
+    use IntellivoidAccounts\Abstracts\AccountRequestPermissions;
+    use IntellivoidAccounts\Abstracts\ApplicationSettingsDatumType;
+    use IntellivoidAccounts\Exceptions\ApplicationSettingsSizeExceededException;
+    use IntellivoidAccounts\Exceptions\DatabaseException;
+    use IntellivoidAccounts\Exceptions\InvalidDataTypeForDatumException;
+    use IntellivoidAccounts\Exceptions\InvalidDatumTypeException;
+    use IntellivoidAccounts\Exceptions\MalformedJsonDataException;
+    use IntellivoidAccounts\Exceptions\VariableNameAlreadyExistsException;
     use IntellivoidAccounts\IntellivoidAccounts;
     use IntellivoidAPI\Objects\AccessRecord;
+    use UserAuthenticationFailure;
 
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "resolve_coa_error.php");
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "client.php");
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "authentication.php");
 
     /**
-     * Class coa_get_access_token
+     * Class application_settings_clear
      */
-    class coa_get_access_token extends Module implements  Response
+    class application_settings_clear extends Module implements  Response
     {
         /**
          * The name of the module
          *
          * @var string
          */
-        public $name = "coa_get_access_token";
+        public $name = "application_settings_clear";
 
         /**
          * The version of this module
@@ -52,7 +54,7 @@
          *
          * @var string
          */
-        public $description = "Returns information about the access token";
+        public $description = "Returns a summary of the Application Settings/Variables";
 
         /**
          * Optional access record for this module
@@ -129,14 +131,17 @@
          */
         public function processRequest()
         {
-            $Parameters = Handler::getParameters(true, true);
+            $IntellivoidAccounts = new IntellivoidAccounts();
 
             try
             {
                 // Process the authentication requirements
-                $Authentication = fetchApplicationAuthentication(true);
+                fetchApplicationAuthentication(true);
+                $AccessToken = fetchUserAuthentication($IntellivoidAccounts);
+                $UserAccount = getUser($IntellivoidAccounts, $AccessToken);
+                $Application = getApplication($IntellivoidAccounts, $AccessToken);
             }
-            catch (HttpAuthenticationFailure $e)
+            catch (HttpAuthenticationFailure | UserAuthenticationFailure $e)
             {
                 $ResponsePayload = array(
                     "success" => false,
@@ -167,106 +172,14 @@
                 return null;
             }
 
-            if(isset($Parameters["access_token"]) == false)
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 400,
-                    "error" => array(
-                        "error_code" => 24,
-                        "message" => resolve_error_code(24),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
-            }
-
-            // Define IntellivoidAccounts
-            $IntellivoidAccounts = new IntellivoidAccounts();
-
-            // Check if the Application Exists
-            try
-            {
-                $Application = $IntellivoidAccounts->getApplicationManager()->getApplication(
-                    ApplicationSearchMethod::byApplicationId, $Authentication["application_id"]
-                );
-            }
-            catch (ApplicationNotFoundException $e)
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 404,
-                    "error" => array(
-                        "error_code" => 2,
-                        "message" => resolve_error_code(2),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
-            }
-            catch(Exception $e)
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 500,
-                    "error" => array(
-                        "error_code" => -1,
-                        "message" => resolve_error_code(-1),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
-            }
-
-            // Validate the secret key
-            if(hash("sha256", $Authentication["secret_key"]) !== hash("sha256", $Application->SecretKey))
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 401,
-                    "error" => array(
-                        "error_code" => 23,
-                        "message" => resolve_error_code(23),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
-            }
-
-            // Check if the Application is suspended
-            if($Application->Status == ApplicationStatus::Suspended)
+            if($AccessToken->has_permission(AccountRequestPermissions::SyncApplicationSettings) == false)
             {
                 $ResponsePayload = array(
                     "success" => false,
                     "response_code" => 403,
                     "error" => array(
-                        "error_code" => 3,
-                        "message" => resolve_error_code(3),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
-            }
-
-            // Check if the Application is disabled
-            if($Application->Status == ApplicationStatus::Disabled)
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 403,
-                    "error" => array(
-                        "error_code" => 4,
-                        "message" => resolve_error_code(4),
+                        "error_code" => 30,
+                        "message" => resolve_error_code(30),
                         "type" => "COA"
                     )
                 );
@@ -277,24 +190,9 @@
 
             try
             {
-                $AuthenticationAccess = $IntellivoidAccounts->getCrossOverAuthenticationManager()->getAuthenticationAccessManager()->getAuthenticationAccess(
-                    AuthenticationAccessSearchMethod::byAccessToken, $Parameters["access_token"]
+                $ApplicationSettings = $IntellivoidAccounts->getApplicationSettingsManager()->smartGetRecord(
+                    $Application->ID, $UserAccount->ID
                 );
-            }
-            catch (AuthenticationAccessNotFoundException $e)
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 401,
-                    "error" => array(
-                        "error_code" => 25,
-                        "message" => resolve_error_code(25),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
             }
             catch(Exception $e)
             {
@@ -303,8 +201,29 @@
                     "response_code" => 500,
                     "error" => array(
                         "error_code" => -1,
-                        "message" => resolve_error_code(-1),
-                        "type" => "COA"
+                        "message" => "An unexpected internal server occurred while trying to retrieve the Application's settings",
+                        "type" => "SERVER"
+                    )
+                );
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+
+            try
+            {
+                $ApplicationSettings->Data = [];
+                $IntellivoidAccounts->getApplicationSettingsManager()->updateRecord($ApplicationSettings);
+            }
+            catch(Exception $e)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 500,
+                    "error" => array(
+                        "error_code" => -1,
+                        "message" => "An unexpected internal server occurred while trying to clear the Application's settings",
+                        "type" => "SERVER"
                     )
                 );
                 $this->response_content = json_encode($ResponsePayload);
@@ -315,10 +234,7 @@
             $ResponsePayload = array(
                 "success" => true,
                 "response_code" => 200,
-                "results" => array(
-                    "granted_permissions" => $AuthenticationAccess->Permissions,
-                    "expires_timestamp" => $AuthenticationAccess->ExpiresTimestamp
-                )
+                "results" => $ApplicationSettings->getSummary()
             );
             $this->response_content = json_encode($ResponsePayload);
             $this->response_code = (int)$ResponsePayload["response_code"];

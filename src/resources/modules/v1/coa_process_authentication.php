@@ -29,16 +29,16 @@
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "authentication.php");
 
     /**
-     * Class coa_get_access_token
+     * Class coa_process_authentication
      */
-    class coa_get_access_token extends Module implements  Response
+    class coa_process_authentication extends Module implements  Response
     {
         /**
          * The name of the module
          *
          * @var string
          */
-        public $name = "coa_get_access_token";
+        public $name = "coa_process_authentication";
 
         /**
          * The version of this module
@@ -52,7 +52,7 @@
          *
          * @var string
          */
-        public $description = "Returns information about the access token";
+        public $description = "Processes the authentication process for the authenticaiton request";
 
         /**
          * Optional access record for this module
@@ -167,14 +167,14 @@
                 return null;
             }
 
-            if(isset($Parameters["access_token"]) == false)
+            if(isset($Parameters["request_token"]) == false)
             {
                 $ResponsePayload = array(
                     "success" => false,
                     "response_code" => 400,
                     "error" => array(
-                        "error_code" => 24,
-                        "message" => resolve_error_code(24),
+                        "error_code" => 39,
+                        "message" => resolve_error_code(39),
                         "type" => "COA"
                     )
                 );
@@ -258,6 +258,7 @@
                 return null;
             }
 
+
             // Check if the Application is disabled
             if($Application->Status == ApplicationStatus::Disabled)
             {
@@ -275,20 +276,76 @@
                 return null;
             }
 
+            // Validate the request token
+            try
+            {
+                $AuthenticationRequest = $IntellivoidAccounts->getCrossOverAuthenticationManager()->getAuthenticationRequestManager()->getAuthenticationRequest(
+                    AuthenticationRequestSearchMethod::requestToken, $Parameters["request_token"]
+                );
+            }
+            catch (AuthenticationRequestNotFoundException $e)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 400,
+                    "error" => array(
+                        "error_code" => 40,
+                        "message" => resolve_error_code(40),
+                        "type" => "COA"
+                    )
+                );
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+            catch(Exception $exception)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 500,
+                    "error" => array(
+                        "error_code" => -1,
+                        "message" => resolve_error_code(-1),
+                        "type" => "COA"
+                    )
+                );
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+
+            // Check if the Authentication Request Token is expired
+            if((int)time() > $AuthenticationRequest->ExpiresTimestamp)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 400,
+                    "error" => array(
+                        "error_code" => 34,
+                        "message" => resolve_error_code(34),
+                        "type" => "COA"
+                    )
+                );
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+
+            // Find the Authentication Access Token
             try
             {
                 $AuthenticationAccess = $IntellivoidAccounts->getCrossOverAuthenticationManager()->getAuthenticationAccessManager()->getAuthenticationAccess(
-                    AuthenticationAccessSearchMethod::byAccessToken, $Parameters["access_token"]
+                    AuthenticationAccessSearchMethod::byRequestId, $AuthenticationRequest->Id
                 );
             }
             catch (AuthenticationAccessNotFoundException $e)
             {
                 $ResponsePayload = array(
                     "success" => false,
-                    "response_code" => 401,
+                    "response_code" => 400,
                     "error" => array(
-                        "error_code" => 25,
-                        "message" => resolve_error_code(25),
+                        "error_code" => 41,
+                        "message" => resolve_error_code(41),
                         "type" => "COA"
                     )
                 );
@@ -312,10 +369,12 @@
                 return null;
             }
 
+            // If all the conditions are met, return the Authentication Token with the related information
             $ResponsePayload = array(
                 "success" => true,
                 "response_code" => 200,
                 "results" => array(
+                    "access_token" => $AuthenticationAccess->AccessToken,
                     "granted_permissions" => $AuthenticationAccess->Permissions,
                     "expires_timestamp" => $AuthenticationAccess->ExpiresTimestamp
                 )

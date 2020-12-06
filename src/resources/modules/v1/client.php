@@ -1,11 +1,15 @@
 <?php
 
+    /**
+     * Class Client
+     */
     class Client
     {
         /**
          * Returns the IP address of the client
          *
          * @return string
+         * @noinspection DuplicatedCode
          */
         public static function getClientIP(): string
         {

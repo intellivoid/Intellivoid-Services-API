@@ -12,22 +12,89 @@
 			"UNAVAILABLE_MESSAGE": "This version is not available at the moment, please check back later",
 			"LIBRARIES": {},
 			"PPM": [
-				{"package": "net.intellivoid.api", "version": "latest", "import_dependencies": true, "throw_error": true},
-				{"package": "net.intellivoid.accounts", "version": "latest", "import_dependencies": true, "throw_error": true}
+				{
+					"package": "net.intellivoid.api",
+					"version": "latest",
+					"import_dependencies": true,
+					"throw_error": true
+				},
+				{
+					"package": "net.intellivoid.accounts",
+					"version": "latest",
+					"import_dependencies": true,
+					"throw_error": true
+				}
 			],
 			"MODULES": [
 				{
-					"script": "get_application", "path": "application",
+					"script": "get_application", "path": "coa/application",
 					"available": true, "authentication_required": false,
 					"unavailable_message": "This module is not available at the moment"
 				},
 				{
-					"script": "coa_request_authentication", "path": "auth/coa/request_authentication",
+					"script": "coa_request_authentication", "path": "coa/auth/request_authentication",
 					"available": true, "authentication_required": false,
 					"unavailable_message": "This module is not available at the moment"
 				},
 				{
-					"script": "coa_get_access_token", "path": "auth/coa/get_access_token",
+					"script": "coa_process_authentication", "path": "coa/auth/process_authentication",
+					"available": true, "authentication_required": false,
+					"unavailable_message": "This module is not available at the moment"
+				},
+				{
+					"script": "coa_get_access_token", "path": "coa/auth/get_access_token",
+					"available": true, "authentication_required": false,
+					"unavailable_message": "This module is not available at the moment"
+				},
+
+				{
+					"script": "accounts_get_user", "path": "accounts/get_user",
+					"available": true, "authentication_required": false,
+					"unavailable_message": "This module is not available at the moment"
+				},
+				{
+					"script": "accounts_get_email", "path": "accounts/get_email",
+					"available": true, "authentication_required": false,
+					"unavailable_message": "This module is not available at the moment"
+				},
+				{
+					"script": "accounts_get_personal_information", "path": "accounts/get_personal_information",
+					"available": true, "authentication_required": false,
+					"unavailable_message": "This module is not available at the moment"
+				},
+
+				{
+					"script": "application_settings_get_summary", "path": "application/settings/get_summary",
+					"available": true, "authentication_required": false,
+					"unavailable_message": "This module is not available at the moment"
+				},
+				{
+					"script": "application_settings_dump", "path": "application/settings/dump",
+					"available": true, "authentication_required": false,
+					"unavailable_message": "This module is not available at the moment"
+				},
+				{
+					"script": "application_settings_add", "path": "application/settings/add",
+					"available": true, "authentication_required": false,
+					"unavailable_message": "This module is not available at the moment"
+				},
+				{
+					"script": "application_settings_clear", "path": "application/settings/clear",
+					"available": true, "authentication_required": false,
+					"unavailable_message": "This module is not available at the moment"
+				},
+				{
+					"script": "application_settings_delete", "path": "application/settings/delete",
+					"available": true, "authentication_required": false,
+					"unavailable_message": "This module is not available at the moment"
+				},
+				{
+					"script": "application_settings_get", "path": "application/settings/get",
+					"available": true, "authentication_required": false,
+					"unavailable_message": "This module is not available at the moment"
+				},
+				{
+					"script": "application_settings_append", "path": "application/settings/append",
 					"available": true, "authentication_required": false,
 					"unavailable_message": "This module is not available at the moment"
 				}
