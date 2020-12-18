@@ -179,6 +179,8 @@
                 fetchApplicationAuthentication(true);
                 $AccessToken = fetchUserAuthentication($IntellivoidAccounts);
                 $UserAccount = getUser($IntellivoidAccounts, $AccessToken);
+                $Application = getApplication($IntellivoidAccounts, $AccessToken);
+                verifyAccess($AccessToken, $Application);
             }
             catch (HttpAuthenticationFailure | UserAuthenticationFailure $e)
             {

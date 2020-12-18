@@ -312,6 +312,22 @@
                 return null;
             }
 
+            if($AuthRequestToken->ApplicationId !== $Application->ID)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 400,
+                    "error" => array(
+                        "error_code" => 40,
+                        "message" => resolve_error_code(40),
+                        "type" => "COA"
+                    )
+                );
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+
             // Check the protocol
             $protocol = "https";
 

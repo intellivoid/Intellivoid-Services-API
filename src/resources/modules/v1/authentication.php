@@ -228,7 +228,7 @@
         else
         {
             // Update the expiry timestamp
-            $access_token->ExpiresTimestamp = (int)time() + 43200;
+            $access_token->ExpiresTimestamp = (int)time() + 172800;
 
             try
             {
@@ -329,3 +329,18 @@
 
         return $Application;
     }
+
+    /**
+     * Verifies the access between the Authentication Access Token and Application
+     *
+     * @param AuthenticationAccess $authenticationAccess
+     * @param Application $application
+     * @throws UserAuthenticationFailure
+     */
+        function verifyAccess(AuthenticationAccess $authenticationAccess, Application $application)
+        {
+            if($authenticationAccess->ApplicationId !== $application->ID)
+            {
+                throw new UserAuthenticationFailure(25, 401);
+            }
+        }

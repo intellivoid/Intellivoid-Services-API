@@ -312,6 +312,22 @@
                 return null;
             }
 
+            if($AuthenticationAccess->ApplicationId !== $Application->ID)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 401,
+                    "error" => array(
+                        "error_code" => 25,
+                        "message" => resolve_error_code(25),
+                        "type" => "COA"
+                    )
+                );
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+
             $ResponsePayload = array(
                 "success" => true,
                 "response_code" => 200,
