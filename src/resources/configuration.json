@@ -1,6 +1,6 @@
 {
 	"NAME": "Intellivoid Accounts API",
-	"DOCUMENTATION_URL": "https://gist.github.com/Netkas/e8977b26f482ca40911a949df7dd286f",
+	"DOCUMENTATION_URL": "https://docs.intellivoid.net/intellivoid/introduction",
 	"BASE_PATH": "/intellivoid",
 	"AVAILABLE": true,
 	"UNAVAILABLE_MESSAGE": "This API service is not available right now",
@@ -27,7 +27,7 @@
 			],
 			"MODULES": [
 				{
-					"script": "get_application", "path": "coa/application",
+					"script": "coa_get_application", "path": "coa/application",
 					"available": true, "authentication_required": false,
 					"unavailable_message": "This module is not available at the moment"
 				},

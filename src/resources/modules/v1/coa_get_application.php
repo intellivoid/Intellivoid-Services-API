@@ -199,12 +199,20 @@
                 return null;
             }
 
+            $EndpointURL = "https://accounts.intellivoid.net/user/contents/public/application?";
             $ResponsePayload = array(
                 "success" => true,
                 "response_code" => 200,
-                "application" => array(
+                "results" => array(
                     "name" => $Application->Name,
                     "name_safe" => $Application->NameSafe,
+                    "logo" => [
+                        "original" => $EndpointURL . http_build_query(["app_id" => $Application->PublicAppId, "resource" => "original"]),
+                        "normal" => $EndpointURL . http_build_query(["app_id" => $Application->PublicAppId, "resource" => "normal"]),
+                        "preview" => $EndpointURL . http_build_query(["app_id" => $Application->PublicAppId, "resource" => "preview"]),
+                        "small" => $EndpointURL . http_build_query(["app_id" => $Application->PublicAppId, "resource" => "small"]),
+                        "tiny" => $EndpointURL . http_build_query(["app_id" => $Application->PublicAppId, "resource" => "tiny"]),
+                    ],
                     "status" => "UNKNOWN",
                     "authentication_mode" => "UNKNOWN",
                     "permissions" => $Application->Permissions,
@@ -214,38 +222,38 @@
             switch($Application->AuthenticationMode)
             {
                 case AuthenticationMode::Redirect:
-                    $ResponsePayload["application"]["authentication_mode"] = "REDIRECT";
+                    $ResponsePayload["results"]["authentication_mode"] = "REDIRECT";
                     break;
 
                 case AuthenticationMode::ApplicationPlaceholder:
-                    $ResponsePayload["application"]["authentication_mode"] = "PLACEHOLDER";
+                    $ResponsePayload["results"]["authentication_mode"] = "PLACEHOLDER";
                     break;
 
                 case AuthenticationMode::Code:
-                    $ResponsePayload["application"]["authentication_mode"] = "RETURN_ACCESS_CODE";
+                    $ResponsePayload["results"]["authentication_mode"] = "RETURN_ACCESS_CODE";
                     break;
 
                 default:
-                    $ResponsePayload["application"]["authentication_mode"] = "UNKNOWN";
+                    $ResponsePayload["results"]["authentication_mode"] = "UNKNOWN";
                     break;
             }
 
-            switch($Application->Status)
+            switch((int)$Application->Status)
             {
                 case ApplicationStatus::Active:
-                    $ResponsePayload["application"]["status"] = "ACTIVE";
+                    $ResponsePayload["results"]["status"] = "ACTIVE";
                     break;
 
                 case ApplicationStatus::Disabled:
-                    $ResponsePayload["application"]["status"] = "DISABLED";
+                    $ResponsePayload["results"]["status"] = "DISABLED";
                     break;
 
                 case ApplicationStatus::Suspended:
-                    $ResponsePayload["application"]["status"] = "SUSPENDED";
+                    $ResponsePayload["results"]["status"] = "SUSPENDED";
                     break;
 
                 default:
-                    $ResponsePayload["application"]["status"] = "UNKNOWN";
+                    $ResponsePayload["results"]["status"] = "UNKNOWN";
                     break;
             }
 
