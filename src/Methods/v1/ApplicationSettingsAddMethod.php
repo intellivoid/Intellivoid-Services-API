@@ -10,10 +10,6 @@
     namespace Methods\v1;
 
     use Exception;
-    use Handler\Abstracts\Module;
-    use Handler\Handler;
-    use Handler\Interfaces\Response;
-    use HttpAuthenticationFailure;
     use IntellivoidAccounts\Abstracts\AccountRequestPermissions;
     use IntellivoidAccounts\Abstracts\ApplicationSettingsDatumType;
     use IntellivoidAccounts\Exceptions\ApplicationSettingsSizeExceededException;
@@ -22,219 +18,109 @@
     use IntellivoidAccounts\Exceptions\MalformedJsonDataException;
     use IntellivoidAccounts\Exceptions\VariableNameAlreadyExistsException;
     use IntellivoidAccounts\IntellivoidAccounts;
-    use IntellivoidAPI\Objects\AccessRecord;
-    use UserAuthenticationFailure;
-
-
+    use KimchiAPI\Abstracts\Method;
+    use KimchiAPI\Abstracts\ResponseStandard;
+    use KimchiAPI\Classes\Request;
+    use KimchiAPI\Objects\Response;
+    use Methods\Utilities\Authentication;
+    use Methods\Utilities\HttpAuthenticationFailure;
+    use Methods\Utilities\UserAuthenticationFailure;
 
     /**
      * Class application_settings_add
      */
-    class ApplicationSettingsAddMethod extends Module implements  Response
+    class ApplicationSettingsAddMethod extends Method
     {
         /**
-         * The name of the module
-         *
-         * @var string
+         * @return Response
          */
-        public $name = "application_settings_add";
-
-        /**
-         * The version of this module
-         *
-         * @var string
-         */
-        public $version = "1.0.0.0";
-
-        /**
-         * The description of this module
-         *
-         * @var string
-         */
-        public $description = "Returns a summary of the Application Settings/Variables";
-
-        /**
-         * Optional access record for this module
-         *
-         * @var AccessRecord
-         */
-        public $access_record;
-
-        /**
-         * The content to give on the response
-         *
-         * @var string
-         */
-        private $response_content;
-
-        /**
-         * The HTTP response code that will be given to the client
-         *
-         * @var int
-         */
-        private $response_code = 200;
-
-        /**
-         * @inheritDoc
-         */
-        public function getContentType(): string
-        {
-            return "application/json";
-        }
-
-        /**
-         * @inheritDoc
-         */
-        public function getContentLength(): int
-        {
-            return strlen($this->response_content);
-        }
-
-        /**
-         * @inheritDoc
-         */
-        public function getBodyContent(): string
-        {
-            return $this->response_content;
-        }
-
-        /**
-         * @inheritDoc
-         */
-        public function getResponseCode(): int
-        {
-            return $this->response_code;
-        }
-
-        /**
-         * @inheritDoc
-         */
-        public function isFile(): bool
-        {
-            return false;
-        }
-
-        /**
-         * @inheritDoc
-         */
-        public function getFileName(): string
-        {
-            return "";
-        }
-
-        /**
-         * @inheritDoc
-         * @noinspection DuplicatedCode
-         */
-        public function processRequest()
+        public function execute(): Response
         {
             $IntellivoidAccounts = new IntellivoidAccounts();
 
             try
             {
                 // Process the authentication requirements
-                fetchApplicationAuthentication(true);
-                $AccessToken = fetchUserAuthentication($IntellivoidAccounts);
-                $UserAccount = getUser($IntellivoidAccounts, $AccessToken);
-                $Application = getApplication($IntellivoidAccounts, $AccessToken);
-                verifyAccess($AccessToken, $Application);
+                Authentication::fetchApplicationAuthentication(true);
+                $AccessToken = Authentication::fetchUserAuthentication($IntellivoidAccounts);
+                $UserAccount = Authentication::getUser($IntellivoidAccounts, $AccessToken);
+                $Application = Authentication::getApplication($IntellivoidAccounts, $AccessToken);
+                Authentication::verifyAccess($AccessToken, $Application);
             }
             catch (HttpAuthenticationFailure | UserAuthenticationFailure $e)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => $e->getStatusCode(),
-                    "error" => array(
-                        "error_code" => $e->getCode(),
-                        "message" => $e->getMessage(),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = $e->getStatusCode();
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = $e->getStatusCode();
+                $Response->ErrorCode = $e->getCode();
+                $Response->ErrorMessage = $e->getMessage();
+                $Response->Exception = $e;
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                return $Response;
             }
             catch(Exception $e)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 500,
-                    "error" => array(
-                        "error_code" => -1,
-                        "message" => "An unexpected internal server occurred while trying to process the client's authentication",
-                        "type" => "SERVER"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 500;
+                $Response->ErrorCode = -1;
+                $Response->ErrorMessage = "An unexpected internal server occurred while trying to process the client's authentication";
+                $Response->Exception = $e;
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                return $Response;
             }
 
             if($AccessToken->has_permission(AccountRequestPermissions::SyncApplicationSettings) == false)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 403,
-                    "error" => array(
-                        "error_code" => 30,
-                        "message" => resolve_error_code(30),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 403;
+                $Response->ErrorCode = 30;
+                $Response->ErrorMessage = Authentication::resolveErrorCode(30);
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                return $Response;
             }
 
-            $Parameters = Handler::getParameters(true, true);
+            $Parameters = Request::getParameters();
 
             // Validate the variable type
             if(isset($Parameters["type"]) == false)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 400,
-                    "error" => array(
-                        "error_code" => 1,
-                        "message" => "Missing parameter 'type'",
-                        "type" => "SETTINGS"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 400;
+                $Response->ErrorCode = 1;
+                $Response->ErrorMessage = "Missing parameter 'type'";
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                return $Response;
             }
 
             if(isset($Parameters["name"]) == false)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 400,
-                    "error" => array(
-                        "error_code" => 3,
-                        "message" => "Missing parameter 'name'",
-                        "type" => "SETTINGS"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 400;
+                $Response->ErrorCode = 3;
+                $Response->ErrorMessage = "Missing parameter 'name'";
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                return $Response;
             }
 
             if(strlen($Parameters["name"]) == 0)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 400,
-                    "error" => array(
-                        "error_code" => 5,
-                        "message" => "Variable name cannot be empty",
-                        "type" => "SETTINGS"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 400;
+                $Response->ErrorCode = 5;
+                $Response->ErrorMessage = "Variable name cannot be empty";
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                return $Response;
             }
 
             $CreateOptions = [
@@ -288,18 +174,14 @@
                     break;
 
                 default:
-                    $ResponsePayload = array(
-                        "success" => false,
-                        "response_code" => 400,
-                        "error" => array(
-                            "error_code" => 2,
-                            "message" => "Invalid variable type",
-                            "type" => "SETTINGS"
-                        )
-                    );
-                    $this->response_content = json_encode($ResponsePayload);
-                    $this->response_code = (int)$ResponsePayload["response_code"];
-                    return null;
+                    $Response = new Response();
+                    $Response->Success = false;
+                    $Response->ResponseCode = 400;
+                    $Response->ErrorCode = 2;
+                    $Response->ErrorMessage = "Invalid variable type";
+                    $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                    return $Response;
             }
 
             try
@@ -310,18 +192,15 @@
             }
             catch(Exception $e)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 500,
-                    "error" => array(
-                        "error_code" => -1,
-                        "message" => "An unexpected internal server occurred while trying to retrieve the Application's settings",
-                        "type" => "SERVER"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 500;
+                $Response->ErrorCode = -1;
+                $Response->ErrorMessage = "An unexpected internal server occurred while trying to retrieve the Application's settings";
+                $Response->Exception = $e;
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                return $Response;
             }
 
             try
@@ -335,66 +214,51 @@
             }
             catch (InvalidDataTypeForDatumException $e)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 400,
-                    "error" => array(
-                        "error_code" => 8,
-                        "message" => $e->getMessage(),
-                        "type" => "SETTINGS"
-                    )
-                );
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 400;
+                $Response->ErrorCode = 8;
+                $Response->ErrorMessage = $e->getMessage();
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+                $Response->Exception = $e;
 
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                return $Response;
             }
             catch (InvalidDatumTypeException $e)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 400,
-                    "error" => array(
-                        "error_code" => 2,
-                        "message" => "Invalid variable type",
-                        "type" => "SETTINGS"
-                    )
-                );
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 400;
+                $Response->ErrorCode = 2;
+                $Response->ErrorMessage = "Invalid variable type";
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+                $Response->Exception = $e;
 
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                return $Response;
             }
             catch (VariableNameAlreadyExistsException $e)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 400,
-                    "error" => array(
-                        "error_code" => 6,
-                        "message" => "Variable already exists and cannot be overwritten",
-                        "type" => "SETTINGS"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 400;
+                $Response->ErrorCode = 6;
+                $Response->ErrorMessage = "Variable already exists and cannot be overwritten";
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+                $Response->Exception = $e;
+
+                return $Response;
             }
             catch (MalformedJsonDataException $e)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 400,
-                    "error" => array(
-                        "error_code" => 7,
-                        "message" => "The value cannot be parsed, expected JSON data",
-                        "type" => "SETTINGS"
-                    )
-                );
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 400;
+                $Response->ErrorCode = 7;
+                $Response->ErrorMessage = "The value cannot be parsed, expected JSON data";
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+                $Response->Exception = $e;
 
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                return $Response;
             }
 
             try
@@ -403,42 +267,34 @@
             }
             catch (ApplicationSettingsSizeExceededException $e)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 400,
-                    "error" => array(
-                        "error_code" => 9,
-                        "message" => "Maximum Application size exceeded",
-                        "type" => "SETTINGS"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 400;
+                $Response->ErrorCode = 9;
+                $Response->ErrorMessage = "Maximum Application size exceeded";
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+                $Response->Exception = $e;
+
+                return $Response;
             }
             catch (Exception $e)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 500,
-                    "error" => array(
-                        "error_code" => -1,
-                        "message" => "An unexpected internal server occurred while trying to push changes",
-                        "type" => "SERVER"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 500;
+                $Response->ErrorCode = -1;
+                $Response->ErrorMessage = "An unexpected internal server occurred while trying to push changes";
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+                $Response->Exception = $e;
+
+                return $Response;
             }
 
-            $ResponsePayload = array(
-                "success" => true,
-                "response_code" => 200,
-                "results" => $ApplicationSettings->getSummary()
-            );
-            $this->response_content = json_encode($ResponsePayload);
-            $this->response_code = (int)$ResponsePayload["response_code"];
-            return null;
+            $Response = new Response();
+            $Response->Success = true;
+            $Response->ResponseCode = 200;
+            $Response->ResultData = $ApplicationSettings->getSummary();
+
+            return $Response;
         }
     }
