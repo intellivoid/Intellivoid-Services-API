@@ -25,9 +25,7 @@
     use IntellivoidAPI\Objects\AccessRecord;
     use UserAuthenticationFailure;
 
-    require_once(__DIR__ . DIRECTORY_SEPARATOR . "resolve_coa_error.php");
-    require_once(__DIR__ . DIRECTORY_SEPARATOR . "client.php");
-    require_once(__DIR__ . DIRECTORY_SEPARATOR . "authentication.php");
+
 
     /**
      * Class application_settings_add

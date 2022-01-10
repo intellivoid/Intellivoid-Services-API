@@ -23,9 +23,7 @@
     use IntellivoidAccounts\IntellivoidAccounts;
     use IntellivoidAPI\Objects\AccessRecord;
 
-    require_once(__DIR__ . DIRECTORY_SEPARATOR . "resolve_coa_error.php");
-    require_once(__DIR__ . DIRECTORY_SEPARATOR . "client.php");
-    require_once(__DIR__ . DIRECTORY_SEPARATOR . "authentication.php");
+
 
     /**
      * Class coa_request_authentication
