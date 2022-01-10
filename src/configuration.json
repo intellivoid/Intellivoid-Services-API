@@ -1,103 +1,33 @@
 {
-	"NAME": "Intellivoid Accounts API",
-	"DOCUMENTATION_URL": "https://docs.intellivoid.net/intellivoid/introduction",
-	"BASE_PATH": "/intellivoid",
-	"AVAILABLE": true,
-	"UNAVAILABLE_MESSAGE": "This API service is not available right now",
-	"DEBUG_EXCEPTIONS": false,
-	"VERSION_CONFIGURATIONS": [
+	"name": "Intellivoid Accounts API",
+	"configuration": {
+		"logging_enabled": true,
+		"root_path": "/intellivoid",
+		"debugging_mode": false,
+		"framework_signature": true,
+		"api_signature": true,
+		"khm_enabled": true,
+		"firewall_deny": [],
+		"headers": {}
+	},
+	"versions": [
 		{
-			"VERSION": "v1",
-			"AVAILABLE": true,
-			"UNAVAILABLE_MESSAGE": "This version is not available at the moment, please check back later",
-			"LIBRARIES": {},
-			"PPM": [
-				{
-					"package": "net.intellivoid.api",
-					"version": "latest",
-					"import_dependencies": true,
-					"throw_error": true
-				},
-				{
-					"package": "net.intellivoid.accounts",
-					"version": "latest",
-					"import_dependencies": true,
-					"throw_error": true
-				}
-			],
-			"MODULES": [
-				{
-					"script": "coa_get_application", "path": "coa/application",
-					"available": true, "authentication_required": false,
-					"unavailable_message": "This module is not available at the moment"
-				},
-				{
-					"script": "coa_request_authentication", "path": "coa/auth/request_authentication",
-					"available": true, "authentication_required": false,
-					"unavailable_message": "This module is not available at the moment"
-				},
-				{
-					"script": "coa_process_authentication", "path": "coa/auth/process_authentication",
-					"available": true, "authentication_required": false,
-					"unavailable_message": "This module is not available at the moment"
-				},
-				{
-					"script": "coa_get_access_token", "path": "coa/auth/get_access_token",
-					"available": true, "authentication_required": false,
-					"unavailable_message": "This module is not available at the moment"
-				},
-
-				{
-					"script": "accounts_get_user", "path": "accounts/get_user",
-					"available": true, "authentication_required": false,
-					"unavailable_message": "This module is not available at the moment"
-				},
-				{
-					"script": "accounts_get_email", "path": "accounts/get_email",
-					"available": true, "authentication_required": false,
-					"unavailable_message": "This module is not available at the moment"
-				},
-				{
-					"script": "accounts_get_personal_information", "path": "accounts/get_personal_information",
-					"available": true, "authentication_required": false,
-					"unavailable_message": "This module is not available at the moment"
-				},
-
-				{
-					"script": "application_settings_get_summary", "path": "application/settings/get_summary",
-					"available": true, "authentication_required": false,
-					"unavailable_message": "This module is not available at the moment"
-				},
-				{
-					"script": "application_settings_dump", "path": "application/settings/dump",
-					"available": true, "authentication_required": false,
-					"unavailable_message": "This module is not available at the moment"
-				},
-				{
-					"script": "application_settings_add", "path": "application/settings/add",
-					"available": true, "authentication_required": false,
-					"unavailable_message": "This module is not available at the moment"
-				},
-				{
-					"script": "application_settings_clear", "path": "application/settings/clear",
-					"available": true, "authentication_required": false,
-					"unavailable_message": "This module is not available at the moment"
-				},
-				{
-					"script": "application_settings_delete", "path": "application/settings/delete",
-					"available": true, "authentication_required": false,
-					"unavailable_message": "This module is not available at the moment"
-				},
-				{
-					"script": "application_settings_get", "path": "application/settings/get",
-					"available": true, "authentication_required": false,
-					"unavailable_message": "This module is not available at the moment"
-				},
-				{
-					"script": "application_settings_append", "path": "application/settings/append",
-					"available": true, "authentication_required": false,
-					"unavailable_message": "This module is not available at the moment"
-				}
+			"version": "v1",
+			"enabled": true,
+			"methods": [
+				{"methods": ["GET", "POST"], "path": "coa/application", "class": "\\Methods\\v1\\CoaGetApplicationMethod"},
+				{"methods": ["GET", "POST"], "path": "coa/auth/request_authentication", "class": "\\Methods\\v1\\CoaRequestAuthenticationMethod"},
+				{"methods": ["GET", "POST"], "path": "coa/auth/process_authentication", "class": "\\Methods\\v1\\CoaProcessAuthenticationMethod"},
+				{"methods": ["GET", "POST"], "path": "coa/auth/get_access_token", "class": "\\Methods\\v1\\CoaGetAccessTokenMethod"},
+				{"methods": ["GET", "POST"], "path": "accounts/get_user", "class": "\\Methods\\v1\\AccountsGetUserMethod"},
+				{"methods": ["GET", "POST"], "path": "accounts/get_email", "class": "\\Methods\\v1\\AccountsGetEmailMethod"},
+				{"methods": ["GET", "POST"], "path": "accounts/get_personal_information", "class": "\\Methods\\v1\\AccountsGetPersonalInformationMethod"},
+				{"methods": ["GET", "POST"], "path": "application/settings/get_summary", "class": "\\Methods\\v1\\ApplicationSettingsGetSummaryMethod"},
+				{"methods": ["GET", "POST"], "path": "application/settings/dump", "class": "\\Methods\\v1\\ApplicationSettingsDumpMethod"},
+				{"methods": ["GET", "POST"], "path": "application/settings/add", "class": "\\Methods\\v1\\ApplicationSettingsAddMethod"},
+				{"methods": ["GET", "POST"], "path": "application/settings/clear", "class": "\\Methods\\v1\\ApplicationSettingsClearMethod"},
+				{"methods": ["GET", "POST"], "path": "application/settings/get", "class": "\\Methods\\v1\\ApplicationSettingsGetMethod"},
+				{"methods": ["GET", "POST"], "path": "application/settings/append", "class": "\\Methods\\v1\\ApplicationSettingsAppendMethod"}
 			]
 		}
 	]
