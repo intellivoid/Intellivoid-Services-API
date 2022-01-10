@@ -37,7 +37,71 @@
     "components": [
         {
             "required": true,
-            "file": "Methods/v1/LookupUserMethod.php"
+            "file": "Methods/v1/ApplicationSettingsDumpMethod.php"
+        },
+        {
+            "required": true,
+            "file": "Methods/v1/CoaGetApplicationMethod.php"
+        },
+        {
+            "required": true,
+            "file": "Methods/v1/AccountsGetUserMethod.php"
+        },
+        {
+            "required": true,
+            "file": "Methods/v1/ApplicationSettingsAddMethod.php"
+        },
+        {
+            "required": true,
+            "file": "Methods/v1/AccountsGetEmailMethod.php"
+        },
+        {
+            "required": true,
+            "file": "Methods/v1/CoaRequestAuthenticationMethod.php"
+        },
+        {
+            "required": true,
+            "file": "Methods/v1/ApplicationSettingsClearMethod.php"
+        },
+        {
+            "required": true,
+            "file": "Methods/v1/CoaGetAccessTokenMethod.php"
+        },
+        {
+            "required": true,
+            "file": "Methods/v1/ApplicationSettingsGetMethod.php"
+        },
+        {
+            "required": true,
+            "file": "Methods/v1/ApplicationSettingsAppendMethod.php"
+        },
+        {
+            "required": true,
+            "file": "Methods/v1/ApplicationSettingsGetSummaryMethod.php"
+        },
+        {
+            "required": true,
+            "file": "Methods/v1/CoaProcessAuthenticationMethod.php"
+        },
+        {
+            "required": true,
+            "file": "Methods/v1/AccountsGetPersonalInformationMethod.php"
+        },
+        {
+            "required": true,
+            "file": "Methods/v1/ApplicationSettingsDeleteMethod.php"
+        },
+        {
+            "required": true,
+            "file": "Methods/Utilities/Authentication.php"
+        },
+        {
+            "required": true,
+            "file": "Methods/Utilities/HttpAuthenticationFailure.php"
+        },
+        {
+            "required": true,
+            "file": "Methods/Utilities/UserAuthenticationFailure.php"
         }
     ],
     "files": [
