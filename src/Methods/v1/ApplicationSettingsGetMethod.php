@@ -7,7 +7,7 @@
      * @noinspection PhpIllegalPsrClassPathInspection
      */
 
-    namespace modules\v1;
+    namespace Methods\v1;
 
     use Exception;
     use Handler\Abstracts\Module;
