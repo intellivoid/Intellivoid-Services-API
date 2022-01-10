@@ -1,0 +1,47 @@
+{
+    "package": {
+        "package_name": "net.intellivoid.services_api",
+        "name": "Intellivoid Services API",
+        "version": "1.0.0.0",
+        "author": "Zi Xing Narrakas",
+        "organization": "Intellivoid Technologies",
+        "description": "The Intellivoid Services API Server",
+        "url": "https://github.com/intellivoid/Intellivoid-Services-API",
+        "dependencies": [
+            {
+                "package": "net.intellivoid.kimchi_api",
+                "version": "latest",
+                "source": "default@github/intellivoid/KimchiAPI",
+                "required": true
+            },
+            {
+                "package": "net.intellivoid.api",
+                "version": "latest",
+                "source": "default@github/intellivoid/Intellivoid-API",
+                "required": true
+            },
+            {
+                "package": "net.intellivoid.accounts",
+                "version": "latest",
+                "source": "default@github/intellivoid/Intellivoid-Accounts",
+                "required": true
+            }
+        ],
+        "configuration": {
+            "autoload_method": "generated_spl",
+            "main": null,
+            "post_installation": [],
+            "pre_installation": []
+        }
+    },
+    "components": [
+        {
+            "required": true,
+            "file": "Methods/v1/LookupUserMethod.php"
+        }
+    ],
+    "files": [
+        "package.json",
+        "configuration.json"
+    ]
+}
