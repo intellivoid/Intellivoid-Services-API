@@ -25,6 +25,12 @@
                 "version": "latest",
                 "source": "default@github/intellivoid/Intellivoid-Accounts",
                 "required": true
+            },
+            {
+                "package": "net.intellivoid.ziproto",
+                "version": "latest",
+                "source": "default@github/intellivoid/ZiProto",
+                "required": true
             }
         ],
         "configuration": {
