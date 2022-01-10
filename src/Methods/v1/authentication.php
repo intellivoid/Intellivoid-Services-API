@@ -22,8 +22,9 @@
     use IntellivoidAccounts\Objects\Account;
     use IntellivoidAccounts\Objects\COA\Application;
     use IntellivoidAccounts\Objects\COA\AuthenticationAccess;
+use KimchiAPI\Classes\Request;
 
-    /**
+/**
      * Class apiAuthenticationFailure
      */
     class HttpAuthenticationFailure extends Exception
@@ -118,7 +119,7 @@
      */
     function fetchApplicationAuthentication(bool $require_secret=true): ?array
     {
-        $Parameters = Handler::getParameters(true, true);
+        $Parameters = Request::getParameters();
 
         $Results = [
             "application_id" => null,
@@ -192,7 +193,7 @@
      */
     function fetchUserAuthentication(IntellivoidAccounts $intellvoidAccounts): AuthenticationAccess
     {
-        $Parameters = Handler::getParameters(true, true);
+        $Parameters = Request::getParameters();
 
         if(isset($Parameters["access_token"]) == false)
         {
