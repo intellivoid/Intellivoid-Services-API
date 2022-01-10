@@ -10,179 +10,71 @@
     namespace Methods\v1;
 
     use Exception;
-    use Handler\Abstracts\Module;
-    use Handler\Interfaces\Response;
-    use HttpAuthenticationFailure;
     use IntellivoidAccounts\Abstracts\AccountRequestPermissions;
-    use IntellivoidAccounts\Exceptions\ApplicationSettingsRecordAlreadyExistsException;
-    use IntellivoidAccounts\Exceptions\ApplicationSettingsRecordNotFoundException;
-    use IntellivoidAccounts\Exceptions\DatabaseException;
-    use IntellivoidAccounts\Exceptions\InvalidDataTypeForDatumException;
-    use IntellivoidAccounts\Exceptions\InvalidDatumTypeException;
-    use IntellivoidAccounts\Exceptions\InvalidSearchMethodException;
     use IntellivoidAccounts\IntellivoidAccounts;
-    use IntellivoidAPI\Objects\AccessRecord;
-    use UserAuthenticationFailure;
-
-
+    use KimchiAPI\Abstracts\Method;
+    use KimchiAPI\Abstracts\ResponseStandard;
+    use KimchiAPI\Objects\Response;
+    use Methods\Utilities\Authentication;
+    use Methods\Utilities\HttpAuthenticationFailure;
+    use Methods\Utilities\UserAuthenticationFailure;
 
     /**
      * Class application_settings_get_summary
      */
-    class ApplicationSettingsGetSummaryMethod extends Module implements  Response
+    class ApplicationSettingsGetSummaryMethod extends Method
     {
         /**
-         * The name of the module
-         *
-         * @var string
+         * @return Response
          */
-        public $name = "application_settings_get_summary";
-
-        /**
-         * The version of this module
-         *
-         * @var string
-         */
-        public $version = "1.0.0.0";
-
-        /**
-         * The description of this module
-         *
-         * @var string
-         */
-        public $description = "Returns a summary of the Application Settings/Variables";
-
-        /**
-         * Optional access record for this module
-         *
-         * @var AccessRecord
-         */
-        public $access_record;
-
-        /**
-         * The content to give on the response
-         *
-         * @var string
-         */
-        private $response_content;
-
-        /**
-         * The HTTP response code that will be given to the client
-         *
-         * @var int
-         */
-        private $response_code = 200;
-
-        /**
-         * @inheritDoc
-         */
-        public function getContentType(): string
-        {
-            return "application/json";
-        }
-
-        /**
-         * @inheritDoc
-         */
-        public function getContentLength(): int
-        {
-            return strlen($this->response_content);
-        }
-
-        /**
-         * @inheritDoc
-         */
-        public function getBodyContent(): string
-        {
-            return $this->response_content;
-        }
-
-        /**
-         * @inheritDoc
-         */
-        public function getResponseCode(): int
-        {
-            return $this->response_code;
-        }
-
-        /**
-         * @inheritDoc
-         */
-        public function isFile(): bool
-        {
-            return false;
-        }
-
-        /**
-         * @inheritDoc
-         */
-        public function getFileName(): string
-        {
-            return "";
-        }
-
-        /**
-         * @inheritDoc
-         * @noinspection DuplicatedCode
-         */
-        public function processRequest()
+        public function execute(): Response
         {
             $IntellivoidAccounts = new IntellivoidAccounts();
 
             try
             {
                 // Process the authentication requirements
-                fetchApplicationAuthentication(true);
-                $AccessToken = fetchUserAuthentication($IntellivoidAccounts);
-                $UserAccount = getUser($IntellivoidAccounts, $AccessToken);
-                $Application = getApplication($IntellivoidAccounts, $AccessToken);
-                verifyAccess($AccessToken, $Application);
+                Authentication::fetchApplicationAuthentication(true);
+                $AccessToken = Authentication::fetchUserAuthentication($IntellivoidAccounts);
+                $UserAccount = Authentication::getUser($IntellivoidAccounts, $AccessToken);
+                $Application = Authentication::getApplication($IntellivoidAccounts, $AccessToken);
+                Authentication::verifyAccess($AccessToken, $Application);
             }
             catch (HttpAuthenticationFailure | UserAuthenticationFailure $e)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => $e->getStatusCode(),
-                    "error" => array(
-                        "error_code" => $e->getCode(),
-                        "message" => $e->getMessage(),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = $e->getStatusCode();
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = $e->getStatusCode();
+                $Response->ErrorCode = $e->getCode();
+                $Response->ErrorMessage = $e->getMessage();
+                $Response->Exception = $e;
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                return $Response;
             }
             catch(Exception $e)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 500,
-                    "error" => array(
-                        "error_code" => -1,
-                        "message" => "An unexpected internal server occurred while trying to process the client's authentication",
-                        "type" => "SERVER"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 500;
+                $Response->ErrorCode = -1;
+                $Response->ErrorMessage = "An unexpected internal server occurred while trying to process the client's authentication";
+                $Response->Exception = $e;
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                return $Response;
             }
 
             if($AccessToken->has_permission(AccountRequestPermissions::SyncApplicationSettings) == false)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 403,
-                    "error" => array(
-                        "error_code" => 30,
-                        "message" => resolve_error_code(30),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 403;
+                $Response->ErrorCode = 30;
+                $Response->ErrorMessage = Authentication::resolveErrorCode(30);
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                return $Response;
             }
 
             try
@@ -193,27 +85,24 @@
             }
             catch(Exception $e)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 500,
-                    "error" => array(
-                        "error_code" => -1,
-                        "message" => "An unexpected internal server occurred while trying to retrieve the Application's settings",
-                        "type" => "SERVER"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 500;
+                $Response->ErrorCode = -1;
+                $Response->ErrorMessage = "An unexpected internal server occurred while trying to retrieve the Application's settings";
+                $Response->Exception = $e;
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                return $Response;
             }
 
-            $ResponsePayload = array(
-                "success" => true,
-                "response_code" => 200,
-                "results" => $ApplicationSettings->getSummary()
-            );
-            $this->response_content = json_encode($ResponsePayload);
-            $this->response_code = (int)$ResponsePayload["response_code"];
-            return null;
+            $Response = new Response();
+            $Response->Success = true;
+            $Response->ResponseCode = 200;
+            $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+            $Response->ResultData = $ApplicationSettings->getSummary();
+
+            return $Response;
         }
     }
