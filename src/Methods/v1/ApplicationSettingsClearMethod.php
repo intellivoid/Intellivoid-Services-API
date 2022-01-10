@@ -11,30 +11,36 @@
 
     use Exception;
     use Handler\Abstracts\Module;
+    use Handler\Handler;
     use Handler\Interfaces\Response;
     use HttpAuthenticationFailure;
-    use IntellivoidAccounts\Abstracts\ApplicationStatus;
-    use IntellivoidAccounts\Abstracts\AuthenticationMode;
-    use IntellivoidAccounts\Abstracts\SearchMethods\ApplicationSearchMethod;
-    use IntellivoidAccounts\Exceptions\ApplicationNotFoundException;
+    use IntellivoidAccounts\Abstracts\AccountRequestPermissions;
+    use IntellivoidAccounts\Abstracts\ApplicationSettingsDatumType;
+    use IntellivoidAccounts\Exceptions\ApplicationSettingsSizeExceededException;
+    use IntellivoidAccounts\Exceptions\DatabaseException;
+    use IntellivoidAccounts\Exceptions\InvalidDataTypeForDatumException;
+    use IntellivoidAccounts\Exceptions\InvalidDatumTypeException;
+    use IntellivoidAccounts\Exceptions\MalformedJsonDataException;
+    use IntellivoidAccounts\Exceptions\VariableNameAlreadyExistsException;
     use IntellivoidAccounts\IntellivoidAccounts;
     use IntellivoidAPI\Objects\AccessRecord;
+    use UserAuthenticationFailure;
 
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "resolve_coa_error.php");
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "client.php");
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "authentication.php");
 
     /**
-     * Class coa_get_application
+     * Class application_settings_clear
      */
-    class coa_get_application extends Module implements  Response
+    class ApplicationSettingsClearMethod extends Module implements  Response
     {
         /**
          * The name of the module
          *
          * @var string
          */
-        public $name = "coa_get_application";
+        public $name = "application_settings_clear";
 
         /**
          * The version of this module
@@ -48,7 +54,7 @@
          *
          * @var string
          */
-        public $description = "Returns information about the Application's Public Information";
+        public $description = "Returns a summary of the Application Settings/Variables";
 
         /**
          * Optional access record for this module
@@ -121,15 +127,22 @@
 
         /**
          * @inheritDoc
+         * @noinspection DuplicatedCode
          */
         public function processRequest()
         {
+            $IntellivoidAccounts = new IntellivoidAccounts();
+
             try
             {
                 // Process the authentication requirements
-                $Authentication = fetchApplicationAuthentication(false);
+                fetchApplicationAuthentication(true);
+                $AccessToken = fetchUserAuthentication($IntellivoidAccounts);
+                $UserAccount = getUser($IntellivoidAccounts, $AccessToken);
+                $Application = getApplication($IntellivoidAccounts, $AccessToken);
+                verifyAccess($AccessToken, $Application);
             }
-            catch (HttpAuthenticationFailure $e)
+            catch (HttpAuthenticationFailure | UserAuthenticationFailure $e)
             {
                 $ResponsePayload = array(
                     "success" => false,
@@ -160,28 +173,27 @@
                 return null;
             }
 
-            $IntellivoidAccounts = new IntellivoidAccounts();
-
-            try
-            {
-                $Application = $IntellivoidAccounts->getApplicationManager()->getApplication(
-                    ApplicationSearchMethod::byApplicationId, $Authentication["application_id"]
-                );
-            }
-            catch (ApplicationNotFoundException $e)
+            if($AccessToken->has_permission(AccountRequestPermissions::SyncApplicationSettings) == false)
             {
                 $ResponsePayload = array(
                     "success" => false,
-                    "response_code" => 404,
+                    "response_code" => 403,
                     "error" => array(
-                        "error_code" => 2,
-                        "message" => resolve_error_code(2),
+                        "error_code" => 30,
+                        "message" => resolve_error_code(30),
                         "type" => "COA"
                     )
                 );
                 $this->response_content = json_encode($ResponsePayload);
                 $this->response_code = (int)$ResponsePayload["response_code"];
                 return null;
+            }
+
+            try
+            {
+                $ApplicationSettings = $IntellivoidAccounts->getApplicationSettingsManager()->smartGetRecord(
+                    $Application->ID, $UserAccount->ID
+                );
             }
             catch(Exception $e)
             {
@@ -190,8 +202,8 @@
                     "response_code" => 500,
                     "error" => array(
                         "error_code" => -1,
-                        "message" => resolve_error_code(-1),
-                        "type" => "COA"
+                        "message" => "An unexpected internal server occurred while trying to retrieve the Application's settings",
+                        "type" => "SERVER"
                     )
                 );
                 $this->response_content = json_encode($ResponsePayload);
@@ -199,67 +211,34 @@
                 return null;
             }
 
-            $EndpointURL = "https://accounts.intellivoid.net/user/contents/public/application?";
+            try
+            {
+                $ApplicationSettings->Data = [];
+                $IntellivoidAccounts->getApplicationSettingsManager()->updateRecord($ApplicationSettings);
+            }
+            catch(Exception $e)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 500,
+                    "error" => array(
+                        "error_code" => -1,
+                        "message" => "An unexpected internal server occurred while trying to clear the Application's settings",
+                        "type" => "SERVER"
+                    )
+                );
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+
             $ResponsePayload = array(
                 "success" => true,
                 "response_code" => 200,
-                "results" => array(
-                    "name" => $Application->Name,
-                    "name_safe" => $Application->NameSafe,
-                    "logo" => [
-                        "original" => $EndpointURL . http_build_query(["app_id" => $Application->PublicAppId, "resource" => "original"]),
-                        "normal" => $EndpointURL . http_build_query(["app_id" => $Application->PublicAppId, "resource" => "normal"]),
-                        "preview" => $EndpointURL . http_build_query(["app_id" => $Application->PublicAppId, "resource" => "preview"]),
-                        "small" => $EndpointURL . http_build_query(["app_id" => $Application->PublicAppId, "resource" => "small"]),
-                        "tiny" => $EndpointURL . http_build_query(["app_id" => $Application->PublicAppId, "resource" => "tiny"]),
-                    ],
-                    "status" => "UNKNOWN",
-                    "authentication_mode" => "UNKNOWN",
-                    "permissions" => $Application->Permissions,
-                )
+                "results" => $ApplicationSettings->getSummary()
             );
-
-            switch($Application->AuthenticationMode)
-            {
-                case AuthenticationMode::Redirect:
-                    $ResponsePayload["results"]["authentication_mode"] = "REDIRECT";
-                    break;
-
-                case AuthenticationMode::ApplicationPlaceholder:
-                    $ResponsePayload["results"]["authentication_mode"] = "PLACEHOLDER";
-                    break;
-
-                case AuthenticationMode::Code:
-                    $ResponsePayload["results"]["authentication_mode"] = "RETURN_ACCESS_CODE";
-                    break;
-
-                default:
-                    $ResponsePayload["results"]["authentication_mode"] = "UNKNOWN";
-                    break;
-            }
-
-            switch((int)$Application->Status)
-            {
-                case ApplicationStatus::Active:
-                    $ResponsePayload["results"]["status"] = "ACTIVE";
-                    break;
-
-                case ApplicationStatus::Disabled:
-                    $ResponsePayload["results"]["status"] = "DISABLED";
-                    break;
-
-                case ApplicationStatus::Suspended:
-                    $ResponsePayload["results"]["status"] = "SUSPENDED";
-                    break;
-
-                default:
-                    $ResponsePayload["results"]["status"] = "UNKNOWN";
-                    break;
-            }
-
             $this->response_content = json_encode($ResponsePayload);
             $this->response_code = (int)$ResponsePayload["response_code"];
             return null;
-
         }
     }

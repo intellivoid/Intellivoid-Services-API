@@ -30,7 +30,7 @@
     /**
      * Class coa_request_authentication
      */
-    class coa_request_authentication extends Module implements  Response
+    class CoaRequestAuthenticationMethod extends Module implements  Response
     {
         /**
          * The name of the module

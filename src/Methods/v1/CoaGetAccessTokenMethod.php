@@ -31,7 +31,7 @@
     /**
      * Class coa_get_access_token
      */
-    class coa_get_access_token extends Module implements  Response
+    class CoaGetAccessToken extends Module implements  Response
     {
         /**
          * The name of the module

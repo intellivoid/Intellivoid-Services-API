@@ -13,26 +13,28 @@
     use Handler\Abstracts\Module;
     use Handler\Interfaces\Response;
     use HttpAuthenticationFailure;
-    use IntellivoidAccounts\Abstracts\AccountRequestPermissions;
+    use IntellivoidAccounts\Abstracts\ApplicationStatus;
+    use IntellivoidAccounts\Abstracts\AuthenticationMode;
+    use IntellivoidAccounts\Abstracts\SearchMethods\ApplicationSearchMethod;
+    use IntellivoidAccounts\Exceptions\ApplicationNotFoundException;
     use IntellivoidAccounts\IntellivoidAccounts;
     use IntellivoidAPI\Objects\AccessRecord;
-    use UserAuthenticationFailure;
 
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "resolve_coa_error.php");
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "client.php");
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "authentication.php");
 
     /**
-     * Class accounts_get_personal_information
+     * Class coa_get_application
      */
-    class accounts_get_personal_information extends Module implements  Response
+    class CoaGetApplicationMethod extends Module implements  Response
     {
         /**
          * The name of the module
          *
          * @var string
          */
-        public $name = "accounts_get_personal_information";
+        public $name = "coa_get_application";
 
         /**
          * The version of this module
@@ -46,7 +48,7 @@
          *
          * @var string
          */
-        public $description = "Returns personal information about the user";
+        public $description = "Returns information about the Application's Public Information";
 
         /**
          * Optional access record for this module
@@ -118,71 +120,16 @@
         }
 
         /**
-         * Checks if the string is null/empty, if it isn't null then it will return the string. If it's null/empty then
-         * it will return a proper null
-         *
-         * @param $input
-         * @return null|string
-         */
-        private function checkString($input): ?string
-        {
-            if(is_null($input) == false)
-            {
-                if(strlen($input) > 0 )
-                {
-                    return $input;
-                }
-            }
-
-            return null;
-        }
-
-        /**
-         * Checks if the integer is null and or zero, if it doesn't meet any of the conditions then it will return a
-         * strict integer. If it's null and or zero then it will return a proper null
-         *
-         * @param $input
-         * @param bool $greater_than_zero
-         * @return null|integer
-         */
-        private function checkInteger($input, bool $greater_than_zero=true): ?int
-        {
-            if(is_null($input) == false)
-            {
-                if($greater_than_zero)
-                {
-                    if((int)$input > 0)
-                    {
-                        return (int)$input;
-                    }
-
-                    return null;
-                }
-
-                return (int)$input;
-            }
-
-            return null;
-        }
-
-        /**
          * @inheritDoc
-         * @noinspection DuplicatedCode
          */
         public function processRequest()
         {
-            $IntellivoidAccounts = new IntellivoidAccounts();
-
             try
             {
                 // Process the authentication requirements
-                fetchApplicationAuthentication(true);
-                $AccessToken = fetchUserAuthentication($IntellivoidAccounts);
-                $UserAccount = getUser($IntellivoidAccounts, $AccessToken);
-                $Application = getApplication($IntellivoidAccounts, $AccessToken);
-                verifyAccess($AccessToken, $Application);
+                $Authentication = fetchApplicationAuthentication(false);
             }
-            catch (HttpAuthenticationFailure | UserAuthenticationFailure $e)
+            catch (HttpAuthenticationFailure $e)
             {
                 $ResponsePayload = array(
                     "success" => false,
@@ -213,14 +160,37 @@
                 return null;
             }
 
-            if($AccessToken->has_permission(AccountRequestPermissions::ReadPersonalInformation) == false)
+            $IntellivoidAccounts = new IntellivoidAccounts();
+
+            try
+            {
+                $Application = $IntellivoidAccounts->getApplicationManager()->getApplication(
+                    ApplicationSearchMethod::byApplicationId, $Authentication["application_id"]
+                );
+            }
+            catch (ApplicationNotFoundException $e)
             {
                 $ResponsePayload = array(
                     "success" => false,
-                    "response_code" => 403,
+                    "response_code" => 404,
                     "error" => array(
-                        "error_code" => 30,
-                        "message" => resolve_error_code(30),
+                        "error_code" => 2,
+                        "message" => resolve_error_code(2),
+                        "type" => "COA"
+                    )
+                );
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+            catch(Exception $e)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 500,
+                    "error" => array(
+                        "error_code" => -1,
+                        "message" => resolve_error_code(-1),
                         "type" => "COA"
                     )
                 );
@@ -229,21 +199,67 @@
                 return null;
             }
 
+            $EndpointURL = "https://accounts.intellivoid.net/user/contents/public/application?";
             $ResponsePayload = array(
                 "success" => true,
                 "response_code" => 200,
-                "results" => [
-                    "first_name" => $this->checkString($UserAccount->PersonalInformation->FirstName),
-                    "last_name" => $this->checkString($UserAccount->PersonalInformation->LastName),
-                    "birthday" => [
-                        "day" => $this->checkInteger($UserAccount->PersonalInformation->BirthDate->Day),
-                        "month" => $this->checkInteger($UserAccount->PersonalInformation->BirthDate->Month),
-                        "year" => $this->checkInteger($UserAccount->PersonalInformation->BirthDate->Year)
-                    ]
-                ]
+                "results" => array(
+                    "name" => $Application->Name,
+                    "name_safe" => $Application->NameSafe,
+                    "logo" => [
+                        "original" => $EndpointURL . http_build_query(["app_id" => $Application->PublicAppId, "resource" => "original"]),
+                        "normal" => $EndpointURL . http_build_query(["app_id" => $Application->PublicAppId, "resource" => "normal"]),
+                        "preview" => $EndpointURL . http_build_query(["app_id" => $Application->PublicAppId, "resource" => "preview"]),
+                        "small" => $EndpointURL . http_build_query(["app_id" => $Application->PublicAppId, "resource" => "small"]),
+                        "tiny" => $EndpointURL . http_build_query(["app_id" => $Application->PublicAppId, "resource" => "tiny"]),
+                    ],
+                    "status" => "UNKNOWN",
+                    "authentication_mode" => "UNKNOWN",
+                    "permissions" => $Application->Permissions,
+                )
             );
+
+            switch($Application->AuthenticationMode)
+            {
+                case AuthenticationMode::Redirect:
+                    $ResponsePayload["results"]["authentication_mode"] = "REDIRECT";
+                    break;
+
+                case AuthenticationMode::ApplicationPlaceholder:
+                    $ResponsePayload["results"]["authentication_mode"] = "PLACEHOLDER";
+                    break;
+
+                case AuthenticationMode::Code:
+                    $ResponsePayload["results"]["authentication_mode"] = "RETURN_ACCESS_CODE";
+                    break;
+
+                default:
+                    $ResponsePayload["results"]["authentication_mode"] = "UNKNOWN";
+                    break;
+            }
+
+            switch((int)$Application->Status)
+            {
+                case ApplicationStatus::Active:
+                    $ResponsePayload["results"]["status"] = "ACTIVE";
+                    break;
+
+                case ApplicationStatus::Disabled:
+                    $ResponsePayload["results"]["status"] = "DISABLED";
+                    break;
+
+                case ApplicationStatus::Suspended:
+                    $ResponsePayload["results"]["status"] = "SUSPENDED";
+                    break;
+
+                default:
+                    $ResponsePayload["results"]["status"] = "UNKNOWN";
+                    break;
+            }
+
             $this->response_content = json_encode($ResponsePayload);
             $this->response_code = (int)$ResponsePayload["response_code"];
             return null;
+
         }
     }

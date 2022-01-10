@@ -15,12 +15,8 @@
     use Handler\Interfaces\Response;
     use HttpAuthenticationFailure;
     use IntellivoidAccounts\Abstracts\AccountRequestPermissions;
-    use IntellivoidAccounts\Abstracts\ApplicationSettingsDatumType;
-    use IntellivoidAccounts\Exceptions\ApplicationSettingsSizeExceededException;
     use IntellivoidAccounts\Exceptions\VariableNotFoundException;
     use IntellivoidAccounts\IntellivoidAccounts;
-    use IntellivoidAccounts\Objects\ApplicationSettings\DatumArray;
-    use IntellivoidAccounts\Objects\ApplicationSettings\DatumList;
     use IntellivoidAccounts\Utilities\Converter;
     use IntellivoidAPI\Objects\AccessRecord;
     use PpmZiProto\ZiProto;
@@ -31,16 +27,16 @@
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "authentication.php");
 
     /**
-     * Class application_settings_get_summary
+     * Class application_settings_get
      */
-    class application_settings_delete extends Module implements  Response
+    class ApplicationSettingsGetMethod extends Module implements  Response
     {
         /**
          * The name of the module
          *
          * @var string
          */
-        public $name = "application_settings_delete";
+        public $name = "application_settings_get";
 
         /**
          * The version of this module
@@ -245,129 +241,9 @@
                 return null;
             }
 
-            $RequestOptions = array(
-                "name" => $Parameters["name"],
-                "delete_mode" => "variable",
-                "by" => null,
-                "value" => null
-            );
-
-            if(isset($Parameters["by"]))
-            {
-                switch(strtolower($Parameters["by"]))
-                {
-                    case "index":
-                    case "key":
-                        $RequestOptions["by"] = strtolower($Parameters["by"]);
-                        $RequestOptions["delete_mode"] = "value";
-                        break;
-
-                    default:
-                        $ResponsePayload = array(
-                            "success" => false,
-                            "response_code" => 400,
-                            "error" => array(
-                                "error_code" => 12,
-                                "message" => "Invalid value in parameter 'by'",
-                                "type" => "SETTINGS"
-                            )
-                        );
-                        $this->response_content = json_encode($ResponsePayload);
-                        $this->response_code = (int)$ResponsePayload["response_code"];
-                        return null;
-                }
-
-                if(isset($Parameters["value"]) == false)
-                {
-                    $ResponsePayload = array(
-                        "success" => false,
-                        "response_code" => 400,
-                        "error" => array(
-                            "error_code" => 4,
-                            "message" => "Missing parameter 'value'",
-                            "type" => "SETTINGS"
-                        )
-                    );
-                    $this->response_content = json_encode($ResponsePayload);
-                    $this->response_code = (int)$ResponsePayload["response_code"];
-                    return null;
-                }
-
-                $RequestOptions["value"] = $Parameters["value"];
-            }
-
-            $SettingsVariable = null;
-
             try
             {
-                if($RequestOptions["delete_mode"] == "variable")
-                {
-                    $ApplicationSettings->delete($Parameters["name"]);
-                }
-                else
-                {
-                    $SettingsVariable = $ApplicationSettings->get($Parameters["name"]);
-                    switch($SettingsVariable->getCurrentType())
-                    {
-                        case ApplicationSettingsDatumType::list:
-                            /** @var DatumList $SettingsVariable */
-
-                            if($RequestOptions["by"] == "index")
-                            {
-                                $SettingsVariable->removeValueByIndex((int)$Parameters["value"]);
-                            }
-                            else
-                            {
-                                $SettingsVariable->removeValueByValue($Parameters["value"]);
-                            }
-
-                            $ApplicationSettings->Data[$Parameters["name"]] = $SettingsVariable;
-                            break;
-
-                        case ApplicationSettingsDatumType::array:
-
-                            if($RequestOptions["by"] == "key")
-                            {
-                                /** @var DatumArray $SettingsVariable */
-                                $SettingsVariable->removeValueByKey($Parameters["value"]);
-
-                            }
-                            else
-                            {
-                                $ResponsePayload = array(
-                                    "success" => false,
-                                    "response_code" => 400,
-                                    "error" => array(
-                                        "error_code" => 14,
-                                        "message" => "Cannot remove value by Index on array data type",
-                                        "type" => "SETTINGS"
-                                    )
-                                );
-                                $this->response_content = json_encode($ResponsePayload);
-                                $this->response_code = (int)$ResponsePayload["response_code"];
-                                return null;
-                            }
-
-                            $ApplicationSettings->Data[$Parameters["name"]] = $SettingsVariable;
-                            break;
-
-                        default:
-                            $ResponsePayload = array(
-                                "success" => false,
-                                "response_code" => 400,
-                                "error" => array(
-                                    "error_code" => 13,
-                                    "message" => "Delete is not applicable to this variable type",
-                                    "type" => "SETTINGS"
-                                )
-                            );
-                            $this->response_content = json_encode($ResponsePayload);
-                            $this->response_code = (int)$ResponsePayload["response_code"];
-                            return null;
-                    }
-                }
-
-                $IntellivoidAccounts->getApplicationSettingsManager()->updateRecord($ApplicationSettings);
+                $Results = $ApplicationSettings->get($Parameters["name"]);
             }
             catch (VariableNotFoundException $e)
             {
@@ -384,21 +260,6 @@
                 $this->response_code = (int)$ResponsePayload["response_code"];
                 return null;
             }
-            catch (ApplicationSettingsSizeExceededException $e)
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 400,
-                    "error" => array(
-                        "error_code" => 9,
-                        "message" => "Maximum Application size exceeded",
-                        "type" => "SETTINGS"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
-            }
             catch (Exception $e)
             {
                 $ResponsePayload = array(
@@ -406,7 +267,7 @@
                     "response_code" => 500,
                     "error" => array(
                         "error_code" => -1,
-                        "message" => "An unexpected internal server occurred while trying to push changes",
+                        "message" => "An unexpected internal server occurred while trying to get data",
                         "type" => "SERVER"
                     )
                 );
@@ -415,50 +276,36 @@
                 return null;
             }
 
-            if($RequestOptions["delete_mode"] == "variable")
+            $IncludeMeta = false;
+            $Parameters = Handler::getParameters(true, true);
+
+            if(isset($Parameters["include_meta"]))
             {
-                $ResponsePayload = array(
-                    "success" => true,
-                    "response_code" => 200,
-                    "results" => $ApplicationSettings->getSummary()
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                if(strtolower($Parameters["include_meta"]) == "true" || (int)$Parameters["include_meta"] == 1)
+                {
+                    $IncludeMeta = true;
+                }
             }
-            else
+
+            $ReturnResults = $Results->getData();
+            if($IncludeMeta)
             {
-
-                $IncludeMeta = false;
-
-                if(isset($Parameters["include_meta"]))
-                {
-                    if(strtolower($Parameters["include_meta"]) == "true" || (int)$Parameters["include_meta"] == 1)
-                    {
-                        $IncludeMeta = true;
-                    }
-                }
-
-                $ReturnResults = $SettingsVariable->getData();
-                if($IncludeMeta)
-                {
-                    $ReturnResults = [
-                        "type" => Converter::applicationDatumTypeToString($SettingsVariable->getCurrentType()),
-                        "value" => $SettingsVariable->getData(),
-                        "created_timestamp" => $SettingsVariable->getCreatedTimestamp(),
-                        "last_updated_timestamp" => $SettingsVariable->getLastUpdatedTimestamp(),
-                        "size" => strlen(ZiProto::encode($SettingsVariable->toArray()))
-                    ];
-                }
-
-                $ResponsePayload = array(
-                    "success" => true,
-                    "response_code" => 200,
-                    "results" => $ReturnResults
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $ReturnResults = [
+                    "type" => Converter::applicationDatumTypeToString($Results->getCurrentType()),
+                    "value" => $Results->getData(),
+                    "created_timestamp" => $Results->getCreatedTimestamp(),
+                    "last_updated_timestamp" => $Results->getLastUpdatedTimestamp(),
+                    "size" => strlen(ZiProto::encode($Results->toArray()))
+                ];
             }
+
+            $ResponsePayload = array(
+                "success" => true,
+                "response_code" => 200,
+                "results" => $ReturnResults
+            );
+            $this->response_content = json_encode($ResponsePayload);
+            $this->response_code = (int)$ResponsePayload["response_code"];
+            return null;
         }
     }

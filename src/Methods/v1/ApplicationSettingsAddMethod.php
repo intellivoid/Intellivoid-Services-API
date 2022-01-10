@@ -14,31 +14,32 @@
     use Handler\Handler;
     use Handler\Interfaces\Response;
     use HttpAuthenticationFailure;
-    use IntellivoidAccounts\Abstracts\ApplicationStatus;
-    use IntellivoidAccounts\Abstracts\SearchMethods\ApplicationSearchMethod;
-    use IntellivoidAccounts\Abstracts\SearchMethods\AuthenticationAccessSearchMethod;
-    use IntellivoidAccounts\Abstracts\SearchMethods\AuthenticationRequestSearchMethod;
-    use IntellivoidAccounts\Exceptions\ApplicationNotFoundException;
-    use IntellivoidAccounts\Exceptions\AuthenticationAccessNotFoundException;
-    use IntellivoidAccounts\Exceptions\AuthenticationRequestNotFoundException;
+    use IntellivoidAccounts\Abstracts\AccountRequestPermissions;
+    use IntellivoidAccounts\Abstracts\ApplicationSettingsDatumType;
+    use IntellivoidAccounts\Exceptions\ApplicationSettingsSizeExceededException;
+    use IntellivoidAccounts\Exceptions\InvalidDataTypeForDatumException;
+    use IntellivoidAccounts\Exceptions\InvalidDatumTypeException;
+    use IntellivoidAccounts\Exceptions\MalformedJsonDataException;
+    use IntellivoidAccounts\Exceptions\VariableNameAlreadyExistsException;
     use IntellivoidAccounts\IntellivoidAccounts;
     use IntellivoidAPI\Objects\AccessRecord;
+    use UserAuthenticationFailure;
 
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "resolve_coa_error.php");
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "client.php");
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "authentication.php");
 
     /**
-     * Class coa_process_authentication
+     * Class application_settings_add
      */
-    class coa_process_authentication extends Module implements  Response
+    class ApplicationSettingsAddMethod extends Module implements  Response
     {
         /**
          * The name of the module
          *
          * @var string
          */
-        public $name = "coa_process_authentication";
+        public $name = "application_settings_add";
 
         /**
          * The version of this module
@@ -52,7 +53,7 @@
          *
          * @var string
          */
-        public $description = "Processes the authentication process for the authenticaiton request";
+        public $description = "Returns a summary of the Application Settings/Variables";
 
         /**
          * Optional access record for this module
@@ -129,14 +130,18 @@
          */
         public function processRequest()
         {
-            $Parameters = Handler::getParameters(true, true);
+            $IntellivoidAccounts = new IntellivoidAccounts();
 
             try
             {
                 // Process the authentication requirements
-                $Authentication = fetchApplicationAuthentication(true);
+                fetchApplicationAuthentication(true);
+                $AccessToken = fetchUserAuthentication($IntellivoidAccounts);
+                $UserAccount = getUser($IntellivoidAccounts, $AccessToken);
+                $Application = getApplication($IntellivoidAccounts, $AccessToken);
+                verifyAccess($AccessToken, $Application);
             }
-            catch (HttpAuthenticationFailure $e)
+            catch (HttpAuthenticationFailure | UserAuthenticationFailure $e)
             {
                 $ResponsePayload = array(
                     "success" => false,
@@ -167,15 +172,34 @@
                 return null;
             }
 
-            if(isset($Parameters["request_token"]) == false)
+            if($AccessToken->has_permission(AccountRequestPermissions::SyncApplicationSettings) == false)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 403,
+                    "error" => array(
+                        "error_code" => 30,
+                        "message" => resolve_error_code(30),
+                        "type" => "COA"
+                    )
+                );
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+
+            $Parameters = Handler::getParameters(true, true);
+
+            // Validate the variable type
+            if(isset($Parameters["type"]) == false)
             {
                 $ResponsePayload = array(
                     "success" => false,
                     "response_code" => 400,
                     "error" => array(
-                        "error_code" => 39,
-                        "message" => resolve_error_code(39),
-                        "type" => "COA"
+                        "error_code" => 1,
+                        "message" => "Missing parameter 'type'",
+                        "type" => "SETTINGS"
                     )
                 );
                 $this->response_content = json_encode($ResponsePayload);
@@ -183,74 +207,15 @@
                 return null;
             }
 
-            // Define IntellivoidAccounts
-            $IntellivoidAccounts = new IntellivoidAccounts();
-
-            // Check if the Application Exists
-            try
-            {
-                $Application = $IntellivoidAccounts->getApplicationManager()->getApplication(
-                    ApplicationSearchMethod::byApplicationId, $Authentication["application_id"]
-                );
-            }
-            catch (ApplicationNotFoundException $e)
+            if(isset($Parameters["name"]) == false)
             {
                 $ResponsePayload = array(
                     "success" => false,
-                    "response_code" => 404,
-                    "error" => array(
-                        "error_code" => 2,
-                        "message" => resolve_error_code(2),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
-            }
-            catch(Exception $e)
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 500,
-                    "error" => array(
-                        "error_code" => -1,
-                        "message" => resolve_error_code(-1),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
-            }
-
-            // Validate the secret key
-            if(hash("sha256", $Authentication["secret_key"]) !== hash("sha256", $Application->SecretKey))
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 401,
-                    "error" => array(
-                        "error_code" => 23,
-                        "message" => resolve_error_code(23),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
-            }
-
-            // Check if the Application is suspended
-            if($Application->Status == ApplicationStatus::Suspended)
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 403,
+                    "response_code" => 400,
                     "error" => array(
                         "error_code" => 3,
-                        "message" => resolve_error_code(3),
-                        "type" => "COA"
+                        "message" => "Missing parameter 'name'",
+                        "type" => "SETTINGS"
                     )
                 );
                 $this->response_content = json_encode($ResponsePayload);
@@ -258,17 +223,15 @@
                 return null;
             }
 
-
-            // Check if the Application is disabled
-            if($Application->Status == ApplicationStatus::Disabled)
+            if(strlen($Parameters["name"]) == 0)
             {
                 $ResponsePayload = array(
                     "success" => false,
-                    "response_code" => 403,
+                    "response_code" => 400,
                     "error" => array(
-                        "error_code" => 4,
-                        "message" => resolve_error_code(4),
-                        "type" => "COA"
+                        "error_code" => 5,
+                        "message" => "Variable name cannot be empty",
+                        "type" => "SETTINGS"
                     )
                 );
                 $this->response_content = json_encode($ResponsePayload);
@@ -276,98 +239,76 @@
                 return null;
             }
 
-            // Validate the request token
+            $CreateOptions = [
+                "value_type" => null,
+                "overwrite" => true,
+                "name" => $Parameters["name"],
+                "value_raw" => null
+            ];
+
+            if(isset($Parameters["value"]))
+            {
+                $CreateOptions["value_raw"] = $Parameters["value"];
+            }
+
+            if(isset($Parameters["overwrite"]))
+            {
+                if(strtolower($Parameters["overwrite"]) == "false" || (int)$Parameters["overwrite"] == 0)
+                {
+                    $CreateOptions["overwrite"] = false;
+                }
+            }
+
+            switch(strtolower($Parameters["type"]))
+            {
+                case (string)ApplicationSettingsDatumType::string:
+                case "string":
+                case "str":
+                    $CreateOptions["value_type"] = ApplicationSettingsDatumType::string;
+                    break;
+
+                case (string)ApplicationSettingsDatumType::boolean:
+                case "boolean":
+                case "bool":
+                    $CreateOptions["value_type"] = ApplicationSettingsDatumType::boolean;
+                    break;
+
+                case (string)ApplicationSettingsDatumType::integer:
+                case "integer":
+                case "int":
+                    $CreateOptions["value_type"] = ApplicationSettingsDatumType::integer;
+                    break;
+
+                case ApplicationSettingsDatumType::list:
+                case "list":
+                    $CreateOptions["value_type"] = ApplicationSettingsDatumType::list;
+                    break;
+
+                case ApplicationSettingsDatumType::array:
+                case "array":
+                    $CreateOptions["value_type"] = ApplicationSettingsDatumType::array;
+                    break;
+
+                default:
+                    $ResponsePayload = array(
+                        "success" => false,
+                        "response_code" => 400,
+                        "error" => array(
+                            "error_code" => 2,
+                            "message" => "Invalid variable type",
+                            "type" => "SETTINGS"
+                        )
+                    );
+                    $this->response_content = json_encode($ResponsePayload);
+                    $this->response_code = (int)$ResponsePayload["response_code"];
+                    return null;
+            }
+
             try
             {
-                $AuthenticationRequest = $IntellivoidAccounts->getCrossOverAuthenticationManager()->getAuthenticationRequestManager()->getAuthenticationRequest(
-                    AuthenticationRequestSearchMethod::requestToken, $Parameters["request_token"]
+                $ApplicationSettings = $IntellivoidAccounts->getApplicationSettingsManager()->smartGetRecord(
+                    $Application->ID, $UserAccount->ID
                 );
-            }
-            catch (AuthenticationRequestNotFoundException $e)
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 400,
-                    "error" => array(
-                        "error_code" => 40,
-                        "message" => resolve_error_code(40),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
-            }
-            catch(Exception $exception)
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 500,
-                    "error" => array(
-                        "error_code" => -1,
-                        "message" => resolve_error_code(-1),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
-            }
-
-            if($AuthenticationRequest->ApplicationId !== $Application->ID)
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 400,
-                    "error" => array(
-                        "error_code" => 40,
-                        "message" => resolve_error_code(40),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
-            }
-
-            // Check if the Authentication Request Token is expired
-            if((int)time() > $AuthenticationRequest->ExpiresTimestamp)
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 400,
-                    "error" => array(
-                        "error_code" => 34,
-                        "message" => resolve_error_code(34),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
-            }
-
-            // Find the Authentication Access Token
-            try
-            {
-                $AuthenticationAccess = $IntellivoidAccounts->getCrossOverAuthenticationManager()->getAuthenticationAccessManager()->getAuthenticationAccess(
-                    AuthenticationAccessSearchMethod::byRequestId, $AuthenticationRequest->Id
-                );
-            }
-            catch (AuthenticationAccessNotFoundException $e)
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 400,
-                    "error" => array(
-                        "error_code" => 41,
-                        "message" => resolve_error_code(41),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
             }
             catch(Exception $e)
             {
@@ -376,8 +317,8 @@
                     "response_code" => 500,
                     "error" => array(
                         "error_code" => -1,
-                        "message" => resolve_error_code(-1),
-                        "type" => "COA"
+                        "message" => "An unexpected internal server occurred while trying to retrieve the Application's settings",
+                        "type" => "SERVER"
                     )
                 );
                 $this->response_content = json_encode($ResponsePayload);
@@ -385,15 +326,118 @@
                 return null;
             }
 
-            // If all the conditions are met, return the Authentication Token with the related information
+            try
+            {
+                $ApplicationSettings->add(
+                    $CreateOptions["value_type"],
+                    $CreateOptions["name"],
+                    $CreateOptions["value_raw"],
+                    $CreateOptions["overwrite"]
+                );
+            }
+            catch (InvalidDataTypeForDatumException $e)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 400,
+                    "error" => array(
+                        "error_code" => 8,
+                        "message" => $e->getMessage(),
+                        "type" => "SETTINGS"
+                    )
+                );
+
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+            catch (InvalidDatumTypeException $e)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 400,
+                    "error" => array(
+                        "error_code" => 2,
+                        "message" => "Invalid variable type",
+                        "type" => "SETTINGS"
+                    )
+                );
+
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+            catch (VariableNameAlreadyExistsException $e)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 400,
+                    "error" => array(
+                        "error_code" => 6,
+                        "message" => "Variable already exists and cannot be overwritten",
+                        "type" => "SETTINGS"
+                    )
+                );
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+            catch (MalformedJsonDataException $e)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 400,
+                    "error" => array(
+                        "error_code" => 7,
+                        "message" => "The value cannot be parsed, expected JSON data",
+                        "type" => "SETTINGS"
+                    )
+                );
+
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+
+            try
+            {
+                $IntellivoidAccounts->getApplicationSettingsManager()->updateRecord($ApplicationSettings);
+            }
+            catch (ApplicationSettingsSizeExceededException $e)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 400,
+                    "error" => array(
+                        "error_code" => 9,
+                        "message" => "Maximum Application size exceeded",
+                        "type" => "SETTINGS"
+                    )
+                );
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+            catch (Exception $e)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 500,
+                    "error" => array(
+                        "error_code" => -1,
+                        "message" => "An unexpected internal server occurred while trying to push changes",
+                        "type" => "SERVER"
+                    )
+                );
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+
             $ResponsePayload = array(
                 "success" => true,
                 "response_code" => 200,
-                "results" => array(
-                    "access_token" => $AuthenticationAccess->AccessToken,
-                    "granted_permissions" => $AuthenticationAccess->Permissions,
-                    "expires_timestamp" => $AuthenticationAccess->ExpiresTimestamp
-                )
+                "results" => $ApplicationSettings->getSummary()
             );
             $this->response_content = json_encode($ResponsePayload);
             $this->response_code = (int)$ResponsePayload["response_code"];

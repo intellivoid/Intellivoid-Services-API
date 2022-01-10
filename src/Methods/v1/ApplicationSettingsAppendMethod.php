@@ -15,8 +15,13 @@
     use Handler\Interfaces\Response;
     use HttpAuthenticationFailure;
     use IntellivoidAccounts\Abstracts\AccountRequestPermissions;
+    use IntellivoidAccounts\Abstracts\ApplicationSettingsDatumType;
+    use IntellivoidAccounts\Exceptions\ApplicationSettingsSizeExceededException;
+    use IntellivoidAccounts\Exceptions\InvalidDataTypeForDatumException;
     use IntellivoidAccounts\Exceptions\VariableNotFoundException;
     use IntellivoidAccounts\IntellivoidAccounts;
+    use IntellivoidAccounts\Objects\ApplicationSettings\DatumArray;
+    use IntellivoidAccounts\Objects\ApplicationSettings\DatumList;
     use IntellivoidAccounts\Utilities\Converter;
     use IntellivoidAPI\Objects\AccessRecord;
     use PpmZiProto\ZiProto;
@@ -29,14 +34,14 @@
     /**
      * Class application_settings_get
      */
-    class application_settings_get extends Module implements  Response
+    class ApplicationSettingsAppendMethod extends Module implements  Response
     {
         /**
          * The name of the module
          *
          * @var string
          */
-        public $name = "application_settings_get";
+        public $name = "application_settings_append";
 
         /**
          * The version of this module
@@ -276,8 +281,157 @@
                 return null;
             }
 
+            switch($Results->getCurrentType())
+            {
+                case ApplicationSettingsDatumType::list:
+                    if(isset($Parameters["value"]) == false)
+                    {
+                        $ResponsePayload = array(
+                            "success" => false,
+                            "response_code" => 400,
+                            "error" => array(
+                                "error_code" => 4,
+                                "message" => "Missing parameter 'value'",
+                                "type" => "SETTINGS"
+                            )
+                        );
+                        $this->response_content = json_encode($ResponsePayload);
+                        $this->response_code = (int)$ResponsePayload["response_code"];
+                        return null;
+                    }
+
+                    try
+                    {
+                        /** @var DatumList $Results */
+                        $Results->appendValue($Parameters["value"]);
+                    }
+                    catch (InvalidDataTypeForDatumException $e)
+                    {
+                        $ResponsePayload = array(
+                            "success" => false,
+                            "response_code" => 400,
+                            "error" => array(
+                                "error_code" => 8,
+                                "message" => $e->getMessage(),
+                                "type" => "SETTINGS"
+                            )
+                        );
+
+                        $this->response_content = json_encode($ResponsePayload);
+                        $this->response_code = (int)$ResponsePayload["response_code"];
+                        return null;
+                    }
+                    break;
+
+                case ApplicationSettingsDatumType::array:
+                    if(isset($Parameters["value"]) == false)
+                    {
+                        $ResponsePayload = array(
+                            "success" => false,
+                            "response_code" => 400,
+                            "error" => array(
+                                "error_code" => 4,
+                                "message" => "Missing parameter 'value'",
+                                "type" => "SETTINGS"
+                            )
+                        );
+                        $this->response_content = json_encode($ResponsePayload);
+                        $this->response_code = (int)$ResponsePayload["response_code"];
+                        return null;
+                    }
+
+                    if(isset($Parameters["key"]) == false)
+                    {
+                        $ResponsePayload = array(
+                            "success" => false,
+                            "response_code" => 400,
+                            "error" => array(
+                                "error_code" => 4,
+                                "message" => "Missing parameter 'key'",
+                                "type" => "SETTINGS"
+                            )
+                        );
+                        $this->response_content = json_encode($ResponsePayload);
+                        $this->response_code = (int)$ResponsePayload["response_code"];
+                        return null;
+                    }
+
+                    try
+                    {
+                        /** @var DatumArray $Results */
+                        $Results->add($Parameters["key"], $Parameters["value"]);
+                    }
+                    catch (InvalidDataTypeForDatumException $e)
+                    {
+                        $ResponsePayload = array(
+                            "success" => false,
+                            "response_code" => 400,
+                            "error" => array(
+                                "error_code" => 8,
+                                "message" => $e->getMessage(),
+                                "type" => "SETTINGS"
+                            )
+                        );
+
+                        $this->response_content = json_encode($ResponsePayload);
+                        $this->response_code = (int)$ResponsePayload["response_code"];
+                        return null;
+                    }
+                    break;
+
+
+                default:
+                    $ResponsePayload = array(
+                        "success" => false,
+                        "response_code" => 400,
+                        "error" => array(
+                            "error_code" => 11,
+                            "message" => "Append not applicable to this variable type",
+                            "type" => "SETTINGS"
+                        )
+                    );
+
+                    $this->response_content = json_encode($ResponsePayload);
+                    $this->response_code = (int)$ResponsePayload["response_code"];
+                    return null;
+            }
+
+            try
+            {
+                $IntellivoidAccounts->getApplicationSettingsManager()->updateRecord($ApplicationSettings);
+            }
+            catch (ApplicationSettingsSizeExceededException $e)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 400,
+                    "error" => array(
+                        "error_code" => 9,
+                        "message" => "Maximum Application size exceeded",
+                        "type" => "SETTINGS"
+                    )
+                );
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+            catch (Exception $e)
+            {
+                $ResponsePayload = array(
+                    "success" => false,
+                    "response_code" => 500,
+                    "error" => array(
+                        "error_code" => -1,
+                        "message" => "An unexpected internal server occurred while trying to push changes",
+                        "type" => "SERVER"
+                    )
+                );
+                $this->response_content = json_encode($ResponsePayload);
+                $this->response_code = (int)$ResponsePayload["response_code"];
+                return null;
+            }
+
             $IncludeMeta = false;
-            $Parameters = Handler::getParameters(true, true);
 
             if(isset($Parameters["include_meta"]))
             {

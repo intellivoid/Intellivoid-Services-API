@@ -14,12 +14,6 @@
     use Handler\Interfaces\Response;
     use HttpAuthenticationFailure;
     use IntellivoidAccounts\Abstracts\AccountRequestPermissions;
-    use IntellivoidAccounts\Exceptions\ApplicationSettingsRecordAlreadyExistsException;
-    use IntellivoidAccounts\Exceptions\ApplicationSettingsRecordNotFoundException;
-    use IntellivoidAccounts\Exceptions\DatabaseException;
-    use IntellivoidAccounts\Exceptions\InvalidDataTypeForDatumException;
-    use IntellivoidAccounts\Exceptions\InvalidDatumTypeException;
-    use IntellivoidAccounts\Exceptions\InvalidSearchMethodException;
     use IntellivoidAccounts\IntellivoidAccounts;
     use IntellivoidAPI\Objects\AccessRecord;
     use UserAuthenticationFailure;
@@ -29,16 +23,16 @@
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "authentication.php");
 
     /**
-     * Class application_settings_get_summary
+     * Class accounts_get_user
      */
-    class application_settings_get_summary extends Module implements  Response
+    class AccountsGetUserMethod extends Module implements  Response
     {
         /**
          * The name of the module
          *
          * @var string
          */
-        public $name = "application_settings_get_summary";
+        public $name = "accounts_get_user";
 
         /**
          * The version of this module
@@ -52,7 +46,7 @@
          *
          * @var string
          */
-        public $description = "Returns a summary of the Application Settings/Variables";
+        public $description = "Returns information about the user";
 
         /**
          * Optional access record for this module
@@ -171,7 +165,7 @@
                 return null;
             }
 
-            if($AccessToken->has_permission(AccountRequestPermissions::SyncApplicationSettings) == false)
+            if($AccessToken->has_permission(AccountRequestPermissions::GetUserDisplay) == false || $AccessToken->has_permission(AccountRequestPermissions::ViewUsername) == false)
             {
                 $ResponsePayload = array(
                     "success" => false,
@@ -187,32 +181,21 @@
                 return null;
             }
 
-            try
-            {
-                $ApplicationSettings = $IntellivoidAccounts->getApplicationSettingsManager()->smartGetRecord(
-                    $Application->ID, $UserAccount->ID
-                );
-            }
-            catch(Exception $e)
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 500,
-                    "error" => array(
-                        "error_code" => -1,
-                        "message" => "An unexpected internal server occurred while trying to retrieve the Application's settings",
-                        "type" => "SERVER"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
-            }
-
+            $EndpointURL = "https://accounts.intellivoid.net/user/contents/public/avatar?";
             $ResponsePayload = array(
                 "success" => true,
                 "response_code" => 200,
-                "results" => $ApplicationSettings->getSummary()
+                "results" => [
+                    "id" => $UserAccount->PublicID,
+                    "username" => $UserAccount->Username,
+                    "avatar" => [
+                        "original" => $EndpointURL . http_build_query(["user_id" => $UserAccount->PublicID, "resource" => "original"]),
+                        "normal" => $EndpointURL . http_build_query(["user_id" => $UserAccount->PublicID, "resource" => "normal"]),
+                        "preview" => $EndpointURL . http_build_query(["user_id" => $UserAccount->PublicID, "resource" => "preview"]),
+                        "small" => $EndpointURL . http_build_query(["user_id" => $UserAccount->PublicID, "resource" => "small"]),
+                        "tiny" => $EndpointURL . http_build_query(["user_id" => $UserAccount->PublicID, "resource" => "tiny"]),
+                    ]
+                ]
             );
             $this->response_content = json_encode($ResponsePayload);
             $this->response_code = (int)$ResponsePayload["response_code"];

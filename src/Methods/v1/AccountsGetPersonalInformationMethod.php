@@ -11,16 +11,9 @@
 
     use Exception;
     use Handler\Abstracts\Module;
-    use Handler\Handler;
     use Handler\Interfaces\Response;
     use HttpAuthenticationFailure;
     use IntellivoidAccounts\Abstracts\AccountRequestPermissions;
-    use IntellivoidAccounts\Abstracts\ApplicationSettingsDatumType;
-    use IntellivoidAccounts\Exceptions\ApplicationSettingsSizeExceededException;
-    use IntellivoidAccounts\Exceptions\InvalidDataTypeForDatumException;
-    use IntellivoidAccounts\Exceptions\InvalidDatumTypeException;
-    use IntellivoidAccounts\Exceptions\MalformedJsonDataException;
-    use IntellivoidAccounts\Exceptions\VariableNameAlreadyExistsException;
     use IntellivoidAccounts\IntellivoidAccounts;
     use IntellivoidAPI\Objects\AccessRecord;
     use UserAuthenticationFailure;
@@ -30,16 +23,16 @@
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "authentication.php");
 
     /**
-     * Class application_settings_dump
+     * Class accounts_get_personal_information
      */
-    class application_settings_dump extends Module implements  Response
+    class AccountsGetPersonalInformationMethod extends Module implements  Response
     {
         /**
          * The name of the module
          *
          * @var string
          */
-        public $name = "application_settings_dump";
+        public $name = "accounts_get_personal_information";
 
         /**
          * The version of this module
@@ -53,7 +46,7 @@
          *
          * @var string
          */
-        public $description = "Returns a summary of the Application Settings/Variables";
+        public $description = "Returns personal information about the user";
 
         /**
          * Optional access record for this module
@@ -125,6 +118,54 @@
         }
 
         /**
+         * Checks if the string is null/empty, if it isn't null then it will return the string. If it's null/empty then
+         * it will return a proper null
+         *
+         * @param $input
+         * @return null|string
+         */
+        private function checkString($input): ?string
+        {
+            if(is_null($input) == false)
+            {
+                if(strlen($input) > 0 )
+                {
+                    return $input;
+                }
+            }
+
+            return null;
+        }
+
+        /**
+         * Checks if the integer is null and or zero, if it doesn't meet any of the conditions then it will return a
+         * strict integer. If it's null and or zero then it will return a proper null
+         *
+         * @param $input
+         * @param bool $greater_than_zero
+         * @return null|integer
+         */
+        private function checkInteger($input, bool $greater_than_zero=true): ?int
+        {
+            if(is_null($input) == false)
+            {
+                if($greater_than_zero)
+                {
+                    if((int)$input > 0)
+                    {
+                        return (int)$input;
+                    }
+
+                    return null;
+                }
+
+                return (int)$input;
+            }
+
+            return null;
+        }
+
+        /**
          * @inheritDoc
          * @noinspection DuplicatedCode
          */
@@ -172,7 +213,7 @@
                 return null;
             }
 
-            if($AccessToken->has_permission(AccountRequestPermissions::SyncApplicationSettings) == false)
+            if($AccessToken->has_permission(AccountRequestPermissions::ReadPersonalInformation) == false)
             {
                 $ResponsePayload = array(
                     "success" => false,
@@ -188,43 +229,18 @@
                 return null;
             }
 
-            try
-            {
-                $ApplicationSettings = $IntellivoidAccounts->getApplicationSettingsManager()->smartGetRecord(
-                    $Application->ID, $UserAccount->ID
-                );
-            }
-            catch(Exception $e)
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 500,
-                    "error" => array(
-                        "error_code" => -1,
-                        "message" => "An unexpected internal server occurred while trying to retrieve the Application's settings",
-                        "type" => "SERVER"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
-            }
-
-            $IncludeMeta = false;
-            $Parameters = Handler::getParameters(true, true);
-
-            if(isset($Parameters["include_meta"]))
-            {
-                if(strtolower($Parameters["include_meta"]) == "true" || (int)$Parameters["include_meta"] == 1)
-                {
-                    $IncludeMeta = true;
-                }
-            }
-
             $ResponsePayload = array(
                 "success" => true,
                 "response_code" => 200,
-                "results" => $ApplicationSettings->dump($IncludeMeta)
+                "results" => [
+                    "first_name" => $this->checkString($UserAccount->PersonalInformation->FirstName),
+                    "last_name" => $this->checkString($UserAccount->PersonalInformation->LastName),
+                    "birthday" => [
+                        "day" => $this->checkInteger($UserAccount->PersonalInformation->BirthDate->Day),
+                        "month" => $this->checkInteger($UserAccount->PersonalInformation->BirthDate->Month),
+                        "year" => $this->checkInteger($UserAccount->PersonalInformation->BirthDate->Year)
+                    ]
+                ]
             );
             $this->response_content = json_encode($ResponsePayload);
             $this->response_code = (int)$ResponsePayload["response_code"];

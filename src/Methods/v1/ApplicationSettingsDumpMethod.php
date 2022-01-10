@@ -17,7 +17,6 @@
     use IntellivoidAccounts\Abstracts\AccountRequestPermissions;
     use IntellivoidAccounts\Abstracts\ApplicationSettingsDatumType;
     use IntellivoidAccounts\Exceptions\ApplicationSettingsSizeExceededException;
-    use IntellivoidAccounts\Exceptions\DatabaseException;
     use IntellivoidAccounts\Exceptions\InvalidDataTypeForDatumException;
     use IntellivoidAccounts\Exceptions\InvalidDatumTypeException;
     use IntellivoidAccounts\Exceptions\MalformedJsonDataException;
@@ -31,16 +30,16 @@
     require_once(__DIR__ . DIRECTORY_SEPARATOR . "authentication.php");
 
     /**
-     * Class application_settings_clear
+     * Class application_settings_dump
      */
-    class application_settings_clear extends Module implements  Response
+    class ApplicationSettingsDumpMethod extends Module implements  Response
     {
         /**
          * The name of the module
          *
          * @var string
          */
-        public $name = "application_settings_clear";
+        public $name = "application_settings_dump";
 
         /**
          * The version of this module
@@ -211,31 +210,21 @@
                 return null;
             }
 
-            try
+            $IncludeMeta = false;
+            $Parameters = Handler::getParameters(true, true);
+
+            if(isset($Parameters["include_meta"]))
             {
-                $ApplicationSettings->Data = [];
-                $IntellivoidAccounts->getApplicationSettingsManager()->updateRecord($ApplicationSettings);
-            }
-            catch(Exception $e)
-            {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 500,
-                    "error" => array(
-                        "error_code" => -1,
-                        "message" => "An unexpected internal server occurred while trying to clear the Application's settings",
-                        "type" => "SERVER"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                if(strtolower($Parameters["include_meta"]) == "true" || (int)$Parameters["include_meta"] == 1)
+                {
+                    $IncludeMeta = true;
+                }
             }
 
             $ResponsePayload = array(
                 "success" => true,
                 "response_code" => 200,
-                "results" => $ApplicationSettings->getSummary()
+                "results" => $ApplicationSettings->dump($IncludeMeta)
             );
             $this->response_content = json_encode($ResponsePayload);
             $this->response_code = (int)$ResponsePayload["response_code"];

@@ -25,7 +25,7 @@
     /**
      * Class accounts_get_email
      */
-    class accounts_get_email extends Module implements  Response
+    class AccountsGetEmailMethod extends Module implements  Response
     {
         /**
          * The name of the module
