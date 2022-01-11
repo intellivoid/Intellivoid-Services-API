@@ -9,159 +9,62 @@
 
     namespace Methods\v1;
 
-    use Client;
     use Exception;
-    use Handler\Abstracts\Module;
-    use Handler\Handler;
-    use Handler\Interfaces\Response;
-    use HttpAuthenticationFailure;
     use IntellivoidAccounts\Abstracts\ApplicationStatus;
     use IntellivoidAccounts\Abstracts\AuthenticationMode;
     use IntellivoidAccounts\Abstracts\AuthenticationRequestStatus;
     use IntellivoidAccounts\Abstracts\SearchMethods\ApplicationSearchMethod;
     use IntellivoidAccounts\Exceptions\ApplicationNotFoundException;
     use IntellivoidAccounts\IntellivoidAccounts;
-    use IntellivoidAPI\Objects\AccessRecord;
-
-
+    use KimchiAPI\Abstracts\Method;
+    use KimchiAPI\Abstracts\ResponseStandard;
+    use KimchiAPI\Classes\Request;
+    use KimchiAPI\Objects\Response;
+    use Methods\Utilities\Authentication;
+    use Methods\Utilities\HttpAuthenticationFailure;
 
     /**
      * Class coa_request_authentication
      */
-    class CoaRequestAuthenticationMethod extends Module implements  Response
+    class CoaRequestAuthenticationMethod extends Method
     {
         /**
-         * The name of the module
-         *
-         * @var string
+         * @return Response
+         * @noinspection PhpIfWithCommonPartsInspection
+         * @noinspection PhpCastIsUnnecessaryInspection
          */
-        public $name = "coa_request_authentication";
-
-        /**
-         * The version of this module
-         *
-         * @var string
-         */
-        public $version = "1.0.0.0";
-
-        /**
-         * The description of this module
-         *
-         * @var string
-         */
-        public $description = "Creates a request token to authenticate to the Application using COA";
-
-        /**
-         * Optional access record for this module
-         *
-         * @var AccessRecord
-         */
-        public $access_record;
-
-        /**
-         * The content to give on the response
-         *
-         * @var string
-         */
-        private $response_content;
-
-        /**
-         * The HTTP response code that will be given to the client
-         *
-         * @var int
-         */
-        private $response_code = 200;
-
-        /**
-         * @inheritDoc
-         */
-        public function getContentType(): string
+        public function execute(): Response
         {
-            return "application/json";
-        }
-
-        /**
-         * @inheritDoc
-         */
-        public function getContentLength(): int
-        {
-            return strlen($this->response_content);
-        }
-
-        /**
-         * @inheritDoc
-         */
-        public function getBodyContent(): string
-        {
-            return $this->response_content;
-        }
-
-        /**
-         * @inheritDoc
-         */
-        public function getResponseCode(): int
-        {
-            return $this->response_code;
-        }
-
-        /**
-         * @inheritDoc
-         */
-        public function isFile(): bool
-        {
-            return false;
-        }
-
-        /**
-         * @inheritDoc
-         */
-        public function getFileName(): string
-        {
-            return "";
-        }
-
-        /**
-         * @inheritDoc
-         * @noinspection DuplicatedCode
-         */
-        public function processRequest()
-        {
-            $Parameters = Handler::getParameters(true, true);
+            $Parameters = Request::getParameters();
 
             try
             {
                 // Process the authentication requirements
-                $Authentication = fetchApplicationAuthentication(false);
+                $Authentication = Authentication::fetchApplicationAuthentication(false);
             }
             catch (HttpAuthenticationFailure $e)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => $e->getStatusCode(),
-                    "error" => array(
-                        "error_code" => $e->getCode(),
-                        "message" => $e->getMessage(),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = $e->getStatusCode();
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = $e->getStatusCode();
+                $Response->ErrorCode = $e->getCode();
+                $Response->ErrorMessage = $e->getMessage();
+                $Response->Exception = $e;
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                return $Response;
             }
             catch(Exception $e)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 500,
-                    "error" => array(
-                        "error_code" => -1,
-                        "message" => "An unexpected internal server occurred while trying to process the client's authentication",
-                        "type" => "SERVER"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 500;
+                $Response->ErrorCode = -1;
+                $Response->ErrorMessage = "An unexpected internal server occurred while trying to process the client's authentication";
+                $Response->Exception = $e;
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                return $Response;
             }
 
             // Define IntellivoidAccounts
@@ -176,67 +79,53 @@
             }
             catch (ApplicationNotFoundException $e)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 404,
-                    "error" => array(
-                        "error_code" => 2,
-                        "message" => resolve_error_code(2),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 404;
+                $Response->ErrorCode = 2;
+                $Response->ErrorMessage = Authentication::resolveErrorCode(2);
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+                $Response->Exception = $e;
+
+                return $Response;
             }
             catch(Exception $e)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 500,
-                    "error" => array(
-                        "error_code" => -1,
-                        "message" => resolve_error_code(-1),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 500;
+                $Response->ErrorCode = -1;
+                $Response->ErrorMessage = Authentication::resolveErrorCode(-1);
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+                $Response->Exception = $e;
+
+                return $Response;
             }
 
             // Check if the Application is suspended
             if($Application->Status == ApplicationStatus::Suspended)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 403,
-                    "error" => array(
-                        "error_code" => 3,
-                        "message" => resolve_error_code(3),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 403;
+                $Response->ErrorCode = 3;
+                $Response->ErrorMessage = Authentication::resolveErrorCode(3);
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                return $Response;
             }
 
             // Check if the Application is disabled
             if($Application->Status == ApplicationStatus::Disabled)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 403,
-                    "error" => array(
-                        "error_code" => 4,
-                        "message" => resolve_error_code(4),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 403;
+                $Response->ErrorCode = 4;
+                $Response->ErrorMessage = Authentication::resolveErrorCode(4);
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                return $Response;
             }
 
             // Check if the required redirect parameter is present
@@ -244,47 +133,52 @@
             {
                 if(isset($Parameters["redirect"]) == false)
                 {
-                    $ResponsePayload = array(
-                        "success" => false,
-                        "response_code" => 400,
-                        "error" => array(
-                            "error_code" => 6,
-                            "message" => resolve_error_code(6),
-                            "type" => "COA"
-                        )
-                    );
-                    $this->response_content = json_encode($ResponsePayload);
-                    $this->response_code = (int)$ResponsePayload["response_code"];
-                    return null;
+                    $Response = new Response();
+                    $Response->Success = false;
+                    $Response->ResponseCode = 400;
+                    $Response->ErrorCode = 6;
+                    $Response->ErrorMessage = Authentication::resolveErrorCode(6);
+                    $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                    return $Response;
                 }
             }
 
             // Check the client
             try
             {
-                $ClientIP = Client::getClientIP();
+                $ClientIP = KIMCHI_CLIENT_IP_ADDRESS;
 
                 if($ClientIP == "::1")
                 {
                     $ClientIP = "127.0.0.1";
                 }
 
-                $KnownHost = $IntellivoidAccounts->getKnownHostsManager()->syncHost($ClientIP, Client::getUserAgentRaw());
+                if(isset($_SERVER['HTTP_USER_AGENT']) == false)
+                {
+                    $Response = new Response();
+                    $Response->Success = false;
+                    $Response->ResponseCode = 400;
+                    $Response->ErrorCode = -1;
+                    $Response->ErrorMessage = "You must provide a user-agent to complete these request";
+                    $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                    return $Response;
+                }
+
+                $KnownHost = $IntellivoidAccounts->getKnownHostsManager()->syncHost($ClientIP, $_SERVER['HTTP_USER_AGENT']);
             }
-            catch(Exception $exception)
+            catch(Exception $e)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 400,
-                    "error" => array(
-                        "error_code" => 5,
-                        "message" => resolve_error_code(5),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 400;
+                $Response->ErrorCode = 5;
+                $Response->ErrorMessage = Authentication::resolveErrorCode(5);
+                $Response->Exception = $e;
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                return $Response;
             }
 
             // Generate an authentication request token
@@ -296,34 +190,27 @@
             }
             catch (Exception $e)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 500,
-                    "error" => array(
-                        "error_code" => -1,
-                        "message" => resolve_error_code(-1),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 500;
+                $Response->ErrorCode = -1;
+                $Response->ErrorMessage = Authentication::resolveErrorCode(-1);
+                $Response->Exception = $e;
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                return $Response;
             }
 
             if($AuthRequestToken->ApplicationId !== $Application->ID)
             {
-                $ResponsePayload = array(
-                    "success" => false,
-                    "response_code" => 400,
-                    "error" => array(
-                        "error_code" => 40,
-                        "message" => resolve_error_code(40),
-                        "type" => "COA"
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = false;
+                $Response->ResponseCode = 400;
+                $Response->ErrorCode = 40;
+                $Response->ErrorMessage = Authentication::resolveErrorCode(40);
+                $Response->ResponseStandard = ResponseStandard::IntellivoidAPI;
+
+                return $Response;
             }
 
             // Check the protocol
@@ -385,20 +272,18 @@
 
                 $AuthenticationUrl = $protocol . "://accounts.intellivoid.net/auth/login?" . http_build_query($AuthenticationParameters);
 
-                $ResponsePayload = array(
-                    "success" => true,
-                    "response_code" => 200,
-                    "results" => array(
-                        "request_token" => $AuthRequestToken->RequestToken,
-                        "requested_permissions" => $AuthRequestToken->RequestedPermissions,
-                        "status" => $AuthenticationRequestStatus,
-                        "authentication_url" => $AuthenticationUrl,
-                        "expires_timestamp" => $AuthRequestToken->ExpiresTimestamp
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = true;
+                $Response->ResponseCode = 200;
+                $Response->ResultData = [
+                    "request_token" => $AuthRequestToken->RequestToken,
+                    "requested_permissions" => $AuthRequestToken->RequestedPermissions,
+                    "status" => $AuthenticationRequestStatus,
+                    "authentication_url" => $AuthenticationUrl,
+                    "expires_timestamp" => $AuthRequestToken->ExpiresTimestamp
+                ];
+
+                return $Response;
             }
             else
             {
@@ -426,20 +311,18 @@
 
                 $AuthenticationUrl = $protocol . "://accounts.intellivoid.net/auth/login?" . http_build_query($AuthenticationParameters);
 
-                $ResponsePayload = array(
-                    "success" => true,
-                    "response_code" => 200,
-                    "results" => array(
-                        "request_token" => $AuthRequestToken->RequestToken,
-                        "requested_permissions" => $AuthRequestToken->RequestedPermissions,
-                        "status" => $AuthenticationRequestStatus,
-                        "authentication_url" => $AuthenticationUrl,
-                        "expires_timestamp" => $AuthRequestToken->ExpiresTimestamp
-                    )
-                );
-                $this->response_content = json_encode($ResponsePayload);
-                $this->response_code = (int)$ResponsePayload["response_code"];
-                return null;
+                $Response = new Response();
+                $Response->Success = true;
+                $Response->ResponseCode = 200;
+                $Response->ResultData = [
+                    "request_token" => $AuthRequestToken->RequestToken,
+                    "requested_permissions" => $AuthRequestToken->RequestedPermissions,
+                    "status" => $AuthenticationRequestStatus,
+                    "authentication_url" => $AuthenticationUrl,
+                    "expires_timestamp" => $AuthRequestToken->ExpiresTimestamp
+                ];
+
+                return $Response;
             }
         }
     }

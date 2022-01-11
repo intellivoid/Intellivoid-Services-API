@@ -26,7 +26,7 @@
          */
         public function __construct(int $coa_error_code, int $status_code)
         {
-            parent::__construct(resolve_error_code($coa_error_code), $coa_error_code);
+            parent::__construct(Authentication::resolveErrorCode($coa_error_code), $coa_error_code);
             $this->coa_error_code = $coa_error_code;
             $this->status_code = $status_code;
         }
